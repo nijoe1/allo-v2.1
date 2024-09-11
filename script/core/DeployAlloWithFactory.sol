@@ -11,6 +11,8 @@ import {ContractFactory} from "contracts/factories/ContractFactory.sol";
 import {DeployAllo} from "script/core/DeployAllo.sol";
 
 contract DeployAlloWithFactory is DeployAllo {
+    error NO_CONTRACT_FACTORY();
+
     function _deploy() internal override returns (address _contract, string memory _contractName) {
         (
             address owner,
@@ -39,7 +41,7 @@ contract DeployAlloWithFactory is DeployAllo {
         }
 
         address factory = _getContractFactory();
-        if (factory == address(0)) revert("No factory contract. Deploy one first.");
+        if (factory == address(0)) revert NO_CONTRACT_FACTORY();
 
         bytes memory creationCode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
@@ -161,8 +163,13 @@ contract DeployAlloWithFactory is DeployAllo {
         // Lukso Testnet
         else if (block.chainid == 4201) {
             factory = 0x7DE1218DCDC3628F839b19a3aF5ACF092C35BcDE;
+        }
+        // Local chain
+        else if (block.chainid == 31337) {
+            // For local test deployments set the ContractFactory address or modify this block to deploy the contract
+            factory = 0x0000000000000000000000000000000000000000;
         } else {
-            revert("Network not supported");
+            revert NETWORK_NOT_SUPPORTED();
         }
     }
 }

@@ -10,6 +10,8 @@ import {Allo} from "contracts/core/Allo.sol";
 import {DeployBase} from "script/DeployBase.sol";
 
 contract DeployAllo is DeployBase {
+    error NETWORK_NOT_SUPPORTED();
+
     function _deploy() internal virtual override returns (address _contract, string memory _contractName) {
         (
             address owner,
@@ -329,8 +331,19 @@ contract DeployAllo is DeployBase {
             baseFee = 0;
             trustedForwarder = 0x0000000000000000000000000000000000000000;
             proxyAdmin = 0x758b87af7fdB4783f848a1dDEa1F025dC48B9858;
+        }
+        // Local chain
+        else if (block.chainid == 31337) {
+            // For local test deployments set vars for this block
+            owner = 0x0000000000000000000000000000000000000000;
+            registry = 0x0000000000000000000000000000000000000000;
+            treasury = 0x0000000000000000000000000000000000000000;
+            percentFee = 0;
+            baseFee = 0;
+            trustedForwarder = 0x0000000000000000000000000000000000000000;
+            proxyAdmin = 0x0000000000000000000000000000000000000000;
         } else {
-            revert("Network not supported");
+            revert NETWORK_NOT_SUPPORTED();
         }
     }
 }
