@@ -28,3 +28,37 @@ forge script DeployAllo --fork-url https://eth-sepolia.public.blastapi.io --priv
 
 Follow steps 1-3 in the Simple deployment section. For step 4. run `forge script ...` using `DeployAlloWithFactory` as `SCRIPT_CONTRACT_NAME`.
 
+# Supported networks
+
+-   fuji
+-   sepolia
+-   celo-testnet
+-   arbitrum-sepolia
+-   optimism-sepolia
+-   optimism-mainnet
+-   celo-mainnet
+-   arbitrum-mainnet
+-   base
+-   polygon
+-   mainnet
+-   avalanche
+-   scroll
+-   ftmTestnet
+-   fantom
+-   filecoin-mainnet
+-   filecoin-calibration
+-   sei-devnet
+-   sei-mainnet
+-   lukso-testnet
+-   lukso-mainnet
+-   zkSyncTestnet
+-   zkSyncMainnet
+
+# Deployment to zkSync
+
+1. Install [foundry-zksync](https://github.com/matter-labs/foundry-zksync)
+2. Deploy as usual
+
+For actions other than deployments, such as running tests or compiling contracts, run `forge` commands using `--zksync`.
+
+
