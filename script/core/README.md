@@ -2,7 +2,7 @@
 
 This folder contains the scripts neccessary to deploy strategies and Allo contracts to the blockchain.
 
-# Usage
+# Simple deployment
 
 1. Install dependencies by running `bun install`.
 2. Compile contracts by running `bun smock && bun compile`.
@@ -23,3 +23,8 @@ For example:
 ```
 forge script DeployAllo --fork-url https://eth-sepolia.public.blastapi.io --private-key 0x0000 --broadcast
 ```
+
+# Deployment through `ContractFactory.sol`
+
+Follow steps 1-3 in the Simple deployment section. For step 4. run `forge script ...` using `DeployAlloWithFactory` as `SCRIPT_CONTRACT_NAME`.
+
