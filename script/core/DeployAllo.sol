@@ -7,18 +7,10 @@ import {TransparentUpgradeableProxy} from
 import {ProxyAdmin} from "openzeppelin-contracts/contracts/proxy/transparent/ProxyAdmin.sol";
 
 import {Allo} from "contracts/core/Allo.sol";
+import {DeployBase} from "script/DeployBase.sol";
 
-contract DeployAllo is Script {
-    function run() public {
-        vm.startBroadcast();
-        (address allo, address alloImplementation) = _deploy();
-        vm.stopBroadcast();
-
-        console.log("Deployed Allo at address: %s", allo);
-        console.log("Allo implementation at address: %s", alloImplementation);
-    }
-
-    function _deploy() internal returns (address alloAddress, address alloImplementation) {
+contract DeployAllo is DeployBase {
+    function _deploy() internal override returns (address _contract, string memory _contractName) {
         (
             address owner,
             address registry,
@@ -31,13 +23,21 @@ contract DeployAllo is Script {
 
         alloImplementation = address(new Allo());
 
+        console.log("Contract: Allo implementation");
+        console.log("Deployed contract at address: %s", alloImplementation);
+        console.log("");
+
         if (proxyAdmin == address(0)) {
             ProxyAdmin admin = new ProxyAdmin();
             admin.transferOwnership(owner);
             proxyAdmin = address(admin);
+
+            console.log("Contract name: ProxyAdmin");
+            console.log("Deployed contract at address: %s", proxyAdmin);
+            console.log("");
         }
 
-        alloAddress = address(
+        _contract = address(
             new TransparentUpgradeableProxy(
                 address(alloImplementation),
                 proxyAdmin, // initial owner address for proxy admin
@@ -46,6 +46,7 @@ contract DeployAllo is Script {
                 )
             )
         );
+        _contractName = "Allo";
     }
 
     function _getAlloParams()
