@@ -22,7 +22,7 @@ contract DeployAlloWithFactory is DeployAllo {
             address proxyAdmin
         ) = _getAlloParams();
 
-        alloImplementation = address(new Allo());
+        address alloImplementation = address(new Allo());
 
         console.log("Contract: Allo implementation");
         console.log("Deployed contract at address: %s", alloImplementation);
@@ -38,25 +38,25 @@ contract DeployAlloWithFactory is DeployAllo {
             console.log("");
         }
 
-        ContractFactory factory = _getContractFactory();
-        if (address(factory) == address(0)) revert("No factory contract. Deploy one first.");
+        address factory = _getContractFactory();
+        if (factory == address(0)) revert("No factory contract. Deploy one first.");
 
         bytes memory creationCode = abi.encodePacked(
             type(TransparentUpgradeableProxy).creationCode,
             abi.encode(
-                address(alloImplementation),
+                alloImplementation,
                 proxyAdmin, // initial owner address for proxy admin
                 abi.encodeCall(
                     Allo.initialize, (owner, registry, payable(treasury), percentFee, baseFee, trustedForwarder)
                 )
             )
         );
-        _contract = factory.deploy("Allo", "v2.1", creationCode);
+        _contract = ContractFactory(factory).deploy("Allo", "v2.1", creationCode);
         _contractName = "Allo";
     }
 
     function _getContractFactory() internal view
-        returns (ContractFactory factory)
+        returns (address factory)
     {
         // Mainnet
         if (block.chainid == 1) {

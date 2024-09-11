@@ -10,7 +10,7 @@ import {Allo} from "contracts/core/Allo.sol";
 import {DeployBase} from "script/DeployBase.sol";
 
 contract DeployAllo is DeployBase {
-    function _deploy() internal override returns (address _contract, string memory _contractName) {
+    function _deploy() internal virtual override returns (address _contract, string memory _contractName) {
         (
             address owner,
             address registry,
@@ -21,7 +21,7 @@ contract DeployAllo is DeployBase {
             address proxyAdmin
         ) = _getAlloParams();
 
-        alloImplementation = address(new Allo());
+        address alloImplementation = address(new Allo());
 
         console.log("Contract: Allo implementation");
         console.log("Deployed contract at address: %s", alloImplementation);
@@ -39,7 +39,7 @@ contract DeployAllo is DeployBase {
 
         _contract = address(
             new TransparentUpgradeableProxy(
-                address(alloImplementation),
+                alloImplementation,
                 proxyAdmin, // initial owner address for proxy admin
                 abi.encodeCall(
                     Allo.initialize, (owner, registry, payable(treasury), percentFee, baseFee, trustedForwarder)
