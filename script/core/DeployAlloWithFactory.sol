@@ -55,9 +55,7 @@ contract DeployAlloWithFactory is DeployAllo {
         _contractName = "Allo";
     }
 
-    function _getContractFactory() internal view
-        returns (address factory)
-    {
+    function _getContractFactory() internal view returns (address factory) {
         // Mainnet
         if (block.chainid == 1) {
             factory = 0xE195743480D1591B79106FF9B296A0cD38aDa807;
