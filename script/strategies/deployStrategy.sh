@@ -23,11 +23,11 @@ deploy() {
       RPC_URL="$CELO_TESTNET_RPC_URL"
       API_KEY="$CELO_API_KEY"
       ;;
-    "celo")
+    "celo-mainnet")
       RPC_URL="$CELO_RPC_URL"
       API_KEY="$CELO_API_KEY"
       ;;
-    "arbitrum")
+    "arbitrum-mainnet")
       RPC_URL="$ARBITRUM_RPC_URL"
       API_KEY="$ARBITRUMSCAN_API_KEY"
       ;;
@@ -35,7 +35,7 @@ deploy() {
       RPC_URL="$OPTIMISM_SEPOLIA_RPC_URL"
       API_KEY="$OPTIMISTIC_ETHERSCAN_API_KEY"
       ;;
-    "optimism")
+    "optimism-mainnet")
       RPC_URL="$OPTIMISM_RPC_URL"
       API_KEY="$OPTIMISTIC_ETHERSCAN_API_KEY"
       ;;
@@ -59,15 +59,15 @@ deploy() {
       RPC_URL="$SCROLL_RPC_URL"
       API_KEY="$SCROLL_API_KEY"
       ;;
-    "ftm-testnet")
+    "ftmTestnet")
       RPC_URL="$FTM_TESTNET_RPC_URL"
       API_KEY="$FTMSCAN_API_KEY"
       ;;
-    "ftm")
+    "fantom")
       RPC_URL="$FTM_RPC_URL"
       API_KEY="$FTMSCAN_API_KEY"
       ;;
-    "filecoin")
+    "filecoin-mainnet")
       RPC_URL="$FILECOIN_RPC_URL"
       API_KEY="$FILECOIN_API_KEY"
       ;;
@@ -79,7 +79,7 @@ deploy() {
       RPC_URL="$SEI_DEVNET_RPC_URL"
       API_KEY="$SEI_API_KEY"
       ;;
-    "sei")
+    "sei-mainnet")
       RPC_URL="$SEI_RPC_URL"
       API_KEY="$SEI_API_KEY"
       ;;
@@ -87,7 +87,7 @@ deploy() {
       RPC_URL="$LUKSO_TESTNET_RPC_URL"
       API_KEY="$LUKSO_API_KEY"
       ;;
-    "lukso")
+    "lukso-mainnet")
       RPC_URL="$LUKSO_RPC_URL"
       API_KEY="$LUKSO_API_KEY"
       ;;
