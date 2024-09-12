@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: AGPL-3.0-only
 pragma solidity ^0.8.19;
 
+// Internal Imports
+// Interfaces
 import {IRecipientsExtension} from "./IRecipientsExtension.sol";
 import {IRegistry} from "contracts/core/interfaces/IRegistry.sol";
+// Core Contracts
 import {BaseStrategy} from "strategies/BaseStrategy.sol";
+// Internal Libraries
 import {Metadata} from "contracts/core/libraries/Metadata.sol";
 import {Errors} from "contracts/core/libraries/Errors.sol";
 
