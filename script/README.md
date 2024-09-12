@@ -1,6 +1,6 @@
-# Deployment scripts
+# Strategy deployment scripts
 
-This folder contains the scripts neccessary to deploy strategies and Allo contracts to the blockchain.
+This folder contains the scripts neccessary to deploy strategies to the blockchain.
 
 # Usage
 
@@ -9,9 +9,42 @@ This folder contains the scripts neccessary to deploy strategies and Allo contra
 3. Fill the necessary environment variables in `.env` file. You can use `.env.example` as a template.
 4. Run the deployment script with:
 ```
-forge script script/${SCRIPT_FILENAME}.sol:${SCRIPT_CONTRACT_NAME} --fork-url ${RPC_URL} --private-key ${PRIVATE_KEY} --broadcast
+script/strategies/deployStrategy.sh ${CHAIN_NAME} ${STRATEGY_NAME}
 ```
 For example:
 ```
-forge script script/DeployDirectAllocation.sol:DeployDirectAllocation --fork-url https://eth-sepolia.public.blastapi.io --private-key 0x0000 --broadcast
+script/strategies/deployStrategy.sh sepolia DeployDirectAllocation
 ```
+
+# Supported networks
+
+-   fuji
+-   sepolia
+-   celo-testnet
+-   arbitrum-sepolia
+-   optimism-sepolia
+-   optimism-mainnet
+-   celo-mainnet
+-   arbitrum-mainnet
+-   base
+-   polygon
+-   mainnet
+-   avalanche
+-   scroll
+-   ftmTestnet
+-   fantom
+-   filecoin-mainnet
+-   filecoin-calibration
+-   sei-devnet
+-   sei-mainnet
+-   lukso-testnet
+-   lukso-mainnet
+-   zkSyncTestnet
+-   zkSyncMainnet
+
+# Deployment to zkSync
+
+1. Install [foundry-zksync](https://github.com/matter-labs/foundry-zksync)
+2. Deploy as usual
+
+For actions other than deployments, such as running tests or compiling contracts, run `forge` commands using `--zksync`.
