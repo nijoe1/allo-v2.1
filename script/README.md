@@ -13,5 +13,5 @@ forge script script/${SCRIPT_FILENAME}.sol:${SCRIPT_CONTRACT_NAME} --fork-url ${
 ```
 For example:
 ```
-forge script script/DeployDirectAllocation.sol:DeployDirectAllocation --fork-url https://eth-sepolia.public.blastapi.io --private-key 0x0000 --broadcast
+forge script script/strategies/DeployDirectAllocation.sol:DeployDirectAllocation --fork-url https://eth-sepolia.public.blastapi.io --private-key 0x0000 --broadcast
 ```
