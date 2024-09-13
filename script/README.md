@@ -15,6 +15,10 @@ For example:
 ```
 script/strategies/deployStrategy.sh sepolia DirectAllocation
 ```
+Or deploying to `local` environment (`127.0.0.1:8545`):
+```
+script/strategies/deployStrategy.sh local DirectAllocation
+```
 
 # Supported networks
 
@@ -41,6 +45,7 @@ script/strategies/deployStrategy.sh sepolia DirectAllocation
 -   lukso-mainnet
 -   zkSyncTestnet
 -   zkSyncMainnet
+-   local
 
 # Supported strategy names
 
