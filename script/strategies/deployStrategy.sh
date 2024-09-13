@@ -119,7 +119,7 @@ deploy() {
   if [ "$chain" == "zkSyncMainnet" ] || [ "$chain" == "zkSyncTestnet" ]; then
     forge script script/strategies/Deploy"$strategy".sol --zksync --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY" --verify --etherscan-api-key "$API_KEY"
   elif [ "$chain" == "local" ]; then
-    forge script script/strategies/Deploy"$strategy".sol --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY"
+    forge script script/strategies/Deploy"$strategy".sol --rpc-url "$RPC_URL" --broadcast
   else
     forge script script/strategies/Deploy"$strategy".sol --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY" --verify --etherscan-api-key "$API_KEY"
   fi

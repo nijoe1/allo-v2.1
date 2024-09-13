@@ -97,6 +97,10 @@ deploy() {
       RPC_URL="$ZK_SYNC_RPC_URL"
       API_KEY="$ZKSYNC_API_KEY"
       ;;
+    "local")
+      RPC_URL="127.0.0.1:8545"
+      API_KEY=" "
+      ;;
     *)
       echo "Error: Unknown chain '$chain'"
       exit 1
@@ -112,6 +116,8 @@ deploy() {
   # Deploy script with resolved variables
   if [ "$chain" == "zkSyncMainnet" ] || [ "$chain" == "zkSyncTestnet" ]; then
     forge script DeployAllo --zksync --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY" --verify --etherscan-api-key "$API_KEY"
+  elif [ "$chain" == "local" ]; then
+    forge script DeployAllo --rpc-url "$RPC_URL" --broadcast
   else
     forge script DeployAllo --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY" --verify --etherscan-api-key "$API_KEY"
   fi

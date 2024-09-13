@@ -20,6 +20,15 @@ For example:
 forge script DeployAllo --fork-url https://eth-sepolia.public.blastapi.io --private-key 0x0000 --broadcast
 ```
 
+# Deployment to local network
+
+1. Follow the steps 1-3 from the previous section.
+2. Setup the local network just calling `anvil`
+3. Run the deployment script with:
+```
+bun run deploy-allo-v2.1 local
+```
+
 # Supported networks
 
 -   fuji
