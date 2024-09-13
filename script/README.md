@@ -15,9 +15,14 @@ For example:
 ```
 script/strategies/deployStrategy.sh sepolia DirectAllocation
 ```
-Or deploying to `local` environment (`127.0.0.1:8545`):
+
+# Deployment to local network
+
+1. Follow the steps 1-3 from the previous section.
+2. Setup the local network just calling `anvil`
+3. Run the deployment script with:
 ```
-script/strategies/deployStrategy.sh local DirectAllocation
+script/strategies/deployStrategy.sh local ${STRATEGY_NAME}
 ```
 
 # Supported networks
