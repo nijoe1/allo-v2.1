@@ -4,7 +4,7 @@ pragma solidity ^0.8.19;
 // Internal Imports
 // Interfaces
 import {IAllo} from "contracts/core/interfaces/IAllo.sol";
-import {IBaseStrategy} from "./IBaseStrategy.sol";
+import {IBaseStrategy} from "strategies/IBaseStrategy.sol";
 // Internal Libraries
 import {Transfer} from "contracts/core/libraries/Transfer.sol";
 

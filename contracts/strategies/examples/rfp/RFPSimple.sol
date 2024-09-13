@@ -5,7 +5,7 @@ pragma solidity ^0.8.19;
 // Interfaces
 import {IAllo} from "contracts/core/interfaces/IAllo.sol";
 // Core Contracts
-import {BaseStrategy} from "../../BaseStrategy.sol";
+import {BaseStrategy} from "strategies/BaseStrategy.sol";
 import {MilestonesExtension} from "strategies/extensions/milestones/MilestonesExtension.sol";
 import {RecipientsExtension} from "strategies/extensions/register/RecipientsExtension.sol";
 // Internal Libraries

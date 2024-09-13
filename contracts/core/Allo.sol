@@ -10,13 +10,13 @@ import {AccessControlUpgradeable} from
 import {ReentrancyGuardUpgradeable} from
     "openzeppelin-contracts-upgradeable/contracts/security/ReentrancyGuardUpgradeable.sol";
 // Internal Imports
-import {IAllo} from "./interfaces/IAllo.sol";
-import {IRegistry} from "./interfaces/IRegistry.sol";
-import {Clone} from "./libraries/Clone.sol";
-import {Errors} from "./libraries/Errors.sol";
-import {Native} from "./libraries/Native.sol";
-import {Transfer} from "./libraries/Transfer.sol";
-import {Metadata} from "./libraries/Metadata.sol";
+import {IAllo} from "contracts/core/interfaces/IAllo.sol";
+import {IRegistry} from "contracts/core/interfaces/IRegistry.sol";
+import {Clone} from "contracts/core/libraries/Clone.sol";
+import {Errors} from "contracts/core/libraries/Errors.sol";
+import {Native} from "contracts/core/libraries/Native.sol";
+import {Transfer} from "contracts/core/libraries/Transfer.sol";
+import {Metadata} from "contracts/core/libraries/Metadata.sol";
 import {IBaseStrategy} from "strategies/IBaseStrategy.sol";
 
 // ⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣷⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⣼⣿⣿⣷⣄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣗⠀⠀⠀⢸⣿⣿⣿⡯⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀

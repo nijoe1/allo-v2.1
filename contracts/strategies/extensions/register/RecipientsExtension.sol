@@ -3,7 +3,7 @@ pragma solidity ^0.8.19;
 
 // Internal Imports
 // Interfaces
-import {IRecipientsExtension} from "./IRecipientsExtension.sol";
+import {IRecipientsExtension} from "strategies/extensions/register/IRecipientsExtension.sol";
 import {IRegistry} from "contracts/core/interfaces/IRegistry.sol";
 // Core Contracts
 import {BaseStrategy} from "strategies/BaseStrategy.sol";
