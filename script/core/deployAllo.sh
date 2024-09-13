@@ -117,7 +117,8 @@ deploy() {
   if [ "$chain" == "zkSyncMainnet" ] || [ "$chain" == "zkSyncTestnet" ]; then
     forge script DeployAllo --zksync --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY" --verify --etherscan-api-key "$API_KEY"
   elif [ "$chain" == "local" ]; then
-    forge script DeployAllo --rpc-url "$RPC_URL" --broadcast
+    # Use anvil's default account's private key
+    forge script DeployAllo --rpc-url "$RPC_URL" --broadcast --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
   else
     forge script DeployAllo --rpc-url "$RPC_URL" --broadcast --private-key "$DEPLOYER_PRIVATE_KEY" --verify --etherscan-api-key "$API_KEY"
   fi
