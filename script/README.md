@@ -13,7 +13,16 @@ script/strategies/deployStrategy.sh ${CHAIN_NAME} ${STRATEGY_NAME}
 ```
 For example:
 ```
-script/strategies/deployStrategy.sh sepolia DeployDirectAllocation
+script/strategies/deployStrategy.sh sepolia DirectAllocation
+```
+
+# Deployment to local network
+
+1. Follow the steps 1-3 from the previous section.
+2. Setup the local network just calling `anvil`
+3. Run the deployment script with:
+```
+script/strategies/deployStrategy.sh local ${STRATEGY_NAME}
 ```
 
 # Supported networks
@@ -41,6 +50,18 @@ script/strategies/deployStrategy.sh sepolia DeployDirectAllocation
 -   lukso-mainnet
 -   zkSyncTestnet
 -   zkSyncMainnet
+-   local
+
+# Supported strategy names
+
+- DirectAllocation
+- DonationVotingMerkleDistribution
+- DonationVotingOffchain
+- DonationVotingOnchain
+- EasyRPGF
+- QVImpactStream
+- QVSimple
+- RFPSimple
 
 # Deployment to zkSync
 
