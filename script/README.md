@@ -13,7 +13,7 @@ script/strategies/deployStrategy.sh ${CHAIN_NAME} ${STRATEGY_NAME}
 ```
 For example:
 ```
-script/strategies/deployStrategy.sh sepolia DeployDirectAllocation
+script/strategies/deployStrategy.sh sepolia DirectAllocation
 ```
 
 # Supported networks
@@ -41,6 +41,17 @@ script/strategies/deployStrategy.sh sepolia DeployDirectAllocation
 -   lukso-mainnet
 -   zkSyncTestnet
 -   zkSyncMainnet
+
+# Supported strategy names
+
+- DirectAllocation
+- DonationVotingMerkleDistribution
+- DonationVotingOffchain
+- DonationVotingOnchain
+- EasyRPGF
+- QVImpactStream
+- QVSimple
+- RFPSimple
 
 # Deployment to zkSync
 
