@@ -29,6 +29,17 @@ forge script DeployAllo --fork-url https://eth-sepolia.public.blastapi.io --priv
 bun run deploy-allo-v2.1 local
 ```
 
+### Notes
+As deployer address, anvil's default account 0 will be used. 
+- Deployer address: `0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266`
+- Deployer private key: `0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80`
+
+For initializing Allo, the following made-up addresses will be used:
+```
+owner = makeAddr("protocol owner");
+treasury = makeAddr("protocol treasury");
+```
+
 # Supported networks
 
 -   fuji
