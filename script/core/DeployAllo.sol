@@ -346,7 +346,7 @@ contract DeployAllo is DeployBase {
         }
     }
 
-    function _deployTestRegistry(address owner, address proxyAdmin) internal returns(address, address) {
+    function _deployTestRegistry(address owner, address proxyAdmin) internal returns (address, address) {
         address registryImplementation = address(new Registry());
 
         console.log("Contract: Registry implementation");
@@ -367,9 +367,7 @@ contract DeployAllo is DeployBase {
             new TransparentUpgradeableProxy(
                 registryImplementation,
                 proxyAdmin, // initial owner address for proxy admin
-                abi.encodeCall(
-                    Registry.initialize, (owner)
-                )
+                abi.encodeCall(Registry.initialize, (owner))
             )
         );
 
