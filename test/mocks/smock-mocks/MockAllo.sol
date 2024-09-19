@@ -17,6 +17,10 @@ contract MockAllo is Allo {
         super._revokeRole(role, account);
     }
 
+    function _grantRole(bytes32 role, address account) internal virtual override {
+        super._grantRole(role, account);
+    }
+
     function _checkOnlyPoolManager(uint256 _poolId, address _address) internal view virtual override {
         super._checkOnlyPoolManager(_poolId, _address);
     }

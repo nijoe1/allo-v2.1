@@ -125,9 +125,12 @@ Allo::distribute
 
 Allo::changeAdmin
 └── given sender is admin of poolId
-    ├── it should call _checkOnlyPoolAdmin
-    ├── it should call _revokeRole
-    └── it should call _grantRole
+    ├── when new admin is zero address
+    │   └── it should revert
+    └── when new admin is not zero address
+        ├── it should call _checkOnlyPoolAdmin
+        ├── it should call _revokeRole
+        └── it should call _grantRole
 
 Allo::_checkOnlyPoolManager
 ├── it should call _isPoolManager
