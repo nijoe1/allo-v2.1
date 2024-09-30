@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.19;
 
+import {IAllo} from "contracts/core/interfaces/IAllo.sol";
 import {Allo} from "contracts/core/Allo.sol";
 import {IBaseStrategy} from "contracts/strategies/IBaseStrategy.sol";
 import {Metadata} from "contracts/core/libraries/Metadata.sol";
@@ -19,6 +20,10 @@ contract MockAllo is Allo {
 
     function _grantRole(bytes32 role, address account) internal virtual override {
         super._grantRole(role, account);
+    }
+
+    function _setRoleAdmin(bytes32 role, bytes32 adminRole) internal virtual override {
+        super._setRoleAdmin(role, adminRole);
     }
 
     function _checkOnlyPoolManager(uint256 _poolId, address _address) internal view virtual override {
@@ -98,5 +103,9 @@ contract MockAllo is Allo {
 
     function _msgSender() internal view virtual override returns (address) {
         return super._msgSender();
+    }
+
+    function setPool(uint256 _poolId, IAllo.Pool memory _pool) public {
+        pools[_poolId] = _pool;
     }
 }
