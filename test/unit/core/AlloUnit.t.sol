@@ -19,7 +19,7 @@ contract AlloUnit is Test {
 
     MockMockAllo allo;
     address public constant NATIVE = 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE;
-    
+
     address public fakeRegistry;
     address public fakeStrategy;
     IAllo.Pool public fakePool;
@@ -326,7 +326,7 @@ contract AlloUnit is Test {
     function test_UpdateTrustedForwarderRevertWhen_SenderIsNotOwner(address _caller, address _trustedForwarder)
         external
     {
-        // owner is set to this 
+        // owner is set to this
         vm.assume(_caller != address(this));
 
         // it should revert
@@ -596,9 +596,7 @@ contract AlloUnit is Test {
         allo.allocate(_poolId, _recipients, _amounts, _data);
     }
 
-    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_dataLength(
-        bytes[] memory _datas
-    ) external {
+    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_dataLength(bytes[] memory _datas) external {
         vm.assume(_datas.length != 1);
 
         uint256[] memory _poolIds = new uint256[](1);
@@ -620,9 +618,7 @@ contract AlloUnit is Test {
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
-    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_valuesLength(
-        uint256[] memory _values
-    ) external {
+    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_valuesLength(uint256[] memory _values) external {
         vm.assume(_values.length != 1);
 
         uint256[] memory _poolIds = new uint256[](1);
@@ -644,9 +640,9 @@ contract AlloUnit is Test {
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
-    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_recipientsLength(
-        address[][] memory _recipients
-    ) external {
+    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_recipientsLength(address[][] memory _recipients)
+        external
+    {
         vm.assume(_recipients.length != 1);
 
         uint256[] memory _poolIds = new uint256[](1);
@@ -667,9 +663,9 @@ contract AlloUnit is Test {
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
-    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_amountsLength(
-        uint256[][] memory _amounts
-    ) external {
+    function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_amountsLength(uint256[][] memory _amounts)
+        external
+    {
         vm.assume(_amounts.length != 1);
         uint256[] memory _poolIds = new uint256[](1);
         _poolIds[0] = 1;
@@ -860,18 +856,10 @@ contract AlloUnit is Test {
         vm.expectCall(
             fakeStrategy, abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData)
         );
-        vm.mockCall(
-            fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.getPoolId.selector),
-            abi.encode(poolId)
-        );
-        vm.mockCall(
-            fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.getAllo.selector),
-            abi.encode(address(allo))
-        );
+        vm.mockCall(fakeStrategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        vm.mockCall(fakeStrategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
         // it should add pool managers
-        for(uint256 i = 0; i < _managers.length; i++) {
+        for (uint256 i = 0; i < _managers.length; i++) {
             allo.mock_call__addPoolManager(poolId, _managers[i]);
             allo.expectCall__addPoolManager(poolId, _managers[i]);
         }
@@ -880,7 +868,15 @@ contract AlloUnit is Test {
         emit PoolCreated(poolId, _profileId, IBaseStrategy(fakeStrategy), _token, 0, _metadata);
 
         allo.call__createPool(
-            address(this), 0, _profileId, IBaseStrategy(fakeStrategy), _initStrategyData, _token, 0, _metadata, _managers
+            address(this),
+            0,
+            _profileId,
+            IBaseStrategy(fakeStrategy),
+            _initStrategyData,
+            _token,
+            0,
+            _metadata,
+            _managers
         );
     }
 
@@ -987,7 +983,8 @@ contract AlloUnit is Test {
         );
         // it should call allocate on the strategy
         vm.expectCall(
-            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator)
+            fakeStrategy,
+            abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator)
         );
 
         allo.call__allocate(_poolId, _recipients, _amounts, _data, _value, _allocator);
