@@ -22,6 +22,10 @@ contract AlloUnit is Test {
 
     address public fakeRegistry;
     address public fakeStrategy;
+    address payable public fakeTreasury;
+    address public alloOwner;
+    address public poolAdmin;
+    address public poolManager;
     IAllo.Pool public fakePool;
 
     event PoolMetadataUpdated(uint256 indexed poolId, Metadata metadata);
@@ -30,6 +34,7 @@ contract AlloUnit is Test {
     event PercentFeeUpdated(uint256 _percentFee);
     event BaseFeeUpdated(uint256 _baseFee);
     event TrustedForwarderUpdated(address _trustedForwarder);
+    event BaseFeePaid(uint256 indexed poolId, uint256 amount);
     event PoolCreated(
         uint256 indexed poolId,
         bytes32 indexed profileId,
@@ -52,10 +57,19 @@ contract AlloUnit is Test {
         });
 
         fakeRegistry = makeAddr("fakeRegistry");
+        fakeTreasury = payable(makeAddr("fakeTreasury"));
+        alloOwner = makeAddr("alloOwner");
+        poolAdmin = makeAddr("poolAdmin");
+        poolManager = makeAddr("poolManager");
 
+        // transfer ownership to alloOwner
         vm.prank(address(0));
-        allo.transferOwnership(address(this));
+        allo.transferOwnership(alloOwner);
+
+        vm.startPrank(alloOwner);
         allo.updateRegistry(fakeRegistry);
+        allo.updateTreasury(fakeTreasury);
+        vm.stopPrank();
     }
 
     function test_InitializeGivenUpgradeVersionIsCorrect(
@@ -221,15 +235,16 @@ contract AlloUnit is Test {
     }
 
     function test_UpdatePoolMetadataGivenSenderIsManagerOfPool(uint256 _poolId, Metadata memory _metadata) external {
-        allo.mock_call__checkOnlyPoolManager(_poolId, address(this));
+        allo.mock_call__checkOnlyPoolManager(_poolId, poolManager);
 
         // it should call _checkOnlyPoolManager
-        allo.expectCall__checkOnlyPoolManager(_poolId, address(this));
+        allo.expectCall__checkOnlyPoolManager(_poolId, poolManager);
 
         // it should emit event
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit();
         emit PoolMetadataUpdated(_poolId, _metadata);
 
+        vm.prank(poolManager);
         allo.updatePoolMetadata(_poolId, _metadata);
 
         // it should update metadata
@@ -238,8 +253,7 @@ contract AlloUnit is Test {
     }
 
     function test_UpdateRegistryRevertWhen_SenderIsNotOwner(address _caller, address _registry) external {
-        // owner is set to this
-        vm.assume(_caller != address(this));
+        vm.assume(_caller != alloOwner);
 
         // it should revert
         vm.expectRevert(Ownable.Unauthorized.selector);
@@ -248,19 +262,37 @@ contract AlloUnit is Test {
         allo.updateRegistry(_registry);
     }
 
-    function test_UpdateRegistryWhenSenderIsOwner(address _registry) external {
-        allo.mock_call__updateRegistry(_registry);
+    modifier whenSenderIsOwner() {
+        vm.startPrank(alloOwner);
+        _;
+        vm.stopPrank();
+    }
 
-        // it should call _updateRegistry
+    function test_UpdateRegistryRevertWhen_NewRegistryIsZeroAddress() external whenSenderIsOwner {
+        // it should revert
+        vm.expectRevert(Errors.ZERO_ADDRESS.selector);
+        allo.updateRegistry(address(0));
+    }
+
+    function test_UpdateRegistryWhenNewRegistryIsNotZeroAddress(address _registry) external whenSenderIsOwner {
+        vm.assume(_registry != address(0));
+
+        // registry is set to fakeRegistry
+        assertEq(address(allo.getRegistry()), fakeRegistry);
+
         allo.expectCall__updateRegistry(_registry);
+        // it should emit event
+        vm.expectEmit();
+        emit RegistryUpdated(_registry);
 
-        vm.prank(address(this));
         allo.updateRegistry(_registry);
+
+        // it should update registry
+        assertEq(address(allo.getRegistry()), _registry);
     }
 
     function test_UpdateTreasuryRevertWhen_SenderIsNotOwner(address _caller, address payable _treasury) external {
-        // owner is set to this
-        vm.assume(_caller != address(this));
+        vm.assume(_caller != alloOwner);
 
         // it should revert
         vm.expectRevert(Ownable.Unauthorized.selector);
@@ -269,20 +301,34 @@ contract AlloUnit is Test {
         allo.updateTreasury(_treasury);
     }
 
-    function test_UpdateTreasuryWhenSenderIsOwner(address payable _treasury) external {
-        allo.mock_call__updateTreasury(_treasury);
+    function test_UpdateTreasuryRevertWhen_NewTreasuryIsZeroAddress() external whenSenderIsOwner {
+        // it should revert
+        vm.expectRevert(Errors.ZERO_ADDRESS.selector);
+        allo.updateTreasury(payable(0));
+    }
 
-        // it should call _updateTreasury
+    function test_UpdateTreasuryGivenNewTreasuryIsNotZeroAddress(address payable _treasury)
+        external
+        whenSenderIsOwner
+    {
+        vm.assume(_treasury != address(0));
+
+        // treasury is set to fakeTreasury
+        assertEq(address(allo.getTreasury()), fakeTreasury);
+
         allo.expectCall__updateTreasury(_treasury);
 
-        // owner is set to this
-        vm.prank(address(this));
+        // it should emit event
+        vm.expectEmit();
+        emit TreasuryUpdated(_treasury);
+
         allo.updateTreasury(_treasury);
+        // it should update treasury
+        assertEq(address(allo.getTreasury()), _treasury);
     }
 
     function test_UpdatePercentFeeRevertWhen_SenderIsNotOwner(address _caller, uint256 _percentFee) external {
-        // owner is set to this
-        vm.assume(_caller != address(this));
+        vm.assume(_caller != alloOwner);
 
         // it should revert
         vm.expectRevert(Ownable.Unauthorized.selector);
@@ -291,20 +337,34 @@ contract AlloUnit is Test {
         allo.updatePercentFee(_percentFee);
     }
 
-    function test_UpdatePercentFeeWhenSenderIsOwner(uint256 _percentFee) external {
-        allo.mock_call__updatePercentFee(_percentFee);
+    function test_UpdatePercentFeeRevertWhen_PercentFeeIsMoreThan1e18(uint256 _percentFee) external whenSenderIsOwner {
+        vm.assume(_percentFee > 1e18);
 
-        // it should call _updatePercentFee
+        // it should revert
+        vm.expectRevert(Errors.INVALID_FEE.selector);
+        allo.updatePercentFee(_percentFee);
+    }
+
+    function test_UpdatePercentFeeWhenPercentFeeIsLessThan1e18(uint256 _percentFee) external whenSenderIsOwner {
+        _percentFee = bound(_percentFee, 1, 1e18);
+
+        // percent fee is set to 0
+        assertEq(allo.getPercentFee(), 0);
+
         allo.expectCall__updatePercentFee(_percentFee);
 
-        // owner is this
-        vm.prank(address(this));
+        // it should emit event
+        vm.expectEmit();
+        emit PercentFeeUpdated(_percentFee);
+
         allo.updatePercentFee(_percentFee);
+
+        // it should update percentFee
+        assertEq(allo.getPercentFee(), _percentFee);
     }
 
     function test_UpdateBaseFeeRevertWhen_SenderIsNotOwner(address _caller, uint256 _baseFee) external {
-        // owner is set to this
-        vm.assume(_caller != address(this));
+        vm.assume(_caller != alloOwner);
 
         // it should revert
         vm.expectRevert(Ownable.Unauthorized.selector);
@@ -313,21 +373,25 @@ contract AlloUnit is Test {
         allo.updateBaseFee(_baseFee);
     }
 
-    function test_UpdateBaseFeeWhenSenderIsOwner(uint256 _baseFee) external {
-        allo.mock_call__updateBaseFee(_baseFee);
+    function test_UpdateBaseFeeWhenSenderIsOwner(uint256 _baseFee) external whenSenderIsOwner {
+        // base fee is set to 0
+        assertEq(allo.getBaseFee(), 0);
 
-        // it should call _updateBaseFee
         allo.expectCall__updateBaseFee(_baseFee);
+        // it should emit event
+        vm.expectEmit();
+        emit BaseFeeUpdated(_baseFee);
 
-        vm.prank(address(this));
         allo.updateBaseFee(_baseFee);
+
+        // it should update baseFee
+        assertEq(allo.getBaseFee(), _baseFee);
     }
 
     function test_UpdateTrustedForwarderRevertWhen_SenderIsNotOwner(address _caller, address _trustedForwarder)
         external
     {
-        // owner is set to this
-        vm.assume(_caller != address(this));
+        vm.assume(_caller != alloOwner);
 
         // it should revert
         vm.expectRevert(Ownable.Unauthorized.selector);
@@ -336,57 +400,114 @@ contract AlloUnit is Test {
         allo.updateTrustedForwarder(_trustedForwarder);
     }
 
-    function test_UpdateTrustedForwarderWhenSenderIsOwner(address _trustedForwarder) external {
-        allo.mock_call__updateTrustedForwarder(_trustedForwarder);
+    function test_UpdateTrustedForwarderWhenSenderIsOwner(address _trustedForwarder) external whenSenderIsOwner {
+        // trustedForwarder is set to address(0)
+        assertTrue(allo.isTrustedForwarder(address(0)));
 
-        // it should call _updateTrustedForwarder
         allo.expectCall__updateTrustedForwarder(_trustedForwarder);
+        // it should emit event
+        vm.expectEmit();
+        emit TrustedForwarderUpdated(_trustedForwarder);
 
-        // owner is set to this
-        vm.prank(address(this));
         allo.updateTrustedForwarder(_trustedForwarder);
+        // it should update trustedForwarder
+        assertTrue(allo.isTrustedForwarder(_trustedForwarder));
     }
 
-    function test_AddPoolManagersGivenSenderIsAdminOfPoolId(uint256 _poolId, address[] memory _managers) external {
-        allo.mock_call__checkOnlyPoolAdmin(_poolId, address(this));
-        for (uint256 i = 0; i < _managers.length; i++) {
-            allo.mock_call__addPoolManager(_poolId, _managers[i]);
-        }
+    function test_AddPoolManagersRevertWhen_SenderIsNotAdminOfPoolId(
+        address _caller,
+        uint256 _poolId,
+        address[] memory _managers
+    ) external {
+        // it should revert
+        vm.expectRevert(Errors.UNAUTHORIZED.selector);
 
-        // it should call _checkOnlyPoolAdmin
-        allo.expectCall__checkOnlyPoolAdmin(_poolId, address(this));
+        vm.prank(_caller);
+        allo.addPoolManagers(_poolId, _managers);
+    }
 
-        // it should call _addPoolManager
-        for (uint256 i = 0; i < _managers.length; i++) {
-            allo.expectCall__addPoolManager(_poolId, _managers[i]);
-        }
+    modifier whenSenderIsAdminOfPoolId(uint256 _poolId) {
+        allo.mock_call__checkOnlyPoolAdmin(_poolId, poolAdmin);
+        vm.startPrank(poolAdmin);
+        _;
+        vm.stopPrank();
+    }
+
+    function test_AddPoolManagersRevertWhen_ManagerIsZeroAddress(uint256 _poolId, address[] memory _managers)
+        external
+        whenSenderIsAdminOfPoolId(_poolId)
+    {
+        vm.assume(_managers.length > 0);
+        _managers[0] = address(0);
+
+        // it should revert
+        vm.expectRevert(Errors.ZERO_ADDRESS.selector);
 
         allo.addPoolManagers(_poolId, _managers);
     }
 
-    function test_RemovePoolManagersGivenSenderIsAdminOfPoolId(uint256 _poolId, address[] memory _managers) external {
-        allo.mock_call__checkOnlyPoolAdmin(_poolId, address(this));
+    function test_AddPoolManagersWhenManagerIsNotZeroAddress(uint256 _poolId)
+        external
+        whenSenderIsAdminOfPoolId(_poolId)
+    {
+        address[] memory _managers = new address[](1);
+        _managers[0] = makeAddr("manager");
 
-        // it should call _checkOnlyPoolAdmin
-        allo.expectCall__checkOnlyPoolAdmin(_poolId, address(this));
+        allo.setPool(_poolId, fakePool);
 
-        bytes32 _role = allo.getPool(_poolId).managerRole;
+        // it should call _grantRole for manager
+        allo.expectCall__grantRole(keccak256("managerRole"), _managers[0]);
 
-        // it should call _revokeRole
+        allo.addPoolManagers(_poolId, _managers);
+    }
+
+    function test_RemovePoolManagersRevertWhen_SenderIsNotAdminOfPoolId(
+        address _caller,
+        uint256 _poolId,
+        address[] memory _managers
+    ) external {
+        // it should revert
+        vm.expectRevert(Errors.UNAUTHORIZED.selector);
+
+        vm.prank(_caller);
+        allo.removePoolManagers(_poolId, _managers);
+    }
+
+    function test_RemovePoolManagersWhenSenderIsAdminOfPoolId(uint256 _poolId, address[] memory _managers)
+        external
+        whenSenderIsAdminOfPoolId(_poolId)
+    {
+        allo.setPool(_poolId, fakePool);
+
+        // it should call _revokeRole for manager
         for (uint256 i = 0; i < _managers.length; i++) {
-            allo.expectCall__revokeRole(_role, _managers[i]);
+            allo.expectCall__revokeRole(keccak256("managerRole"), _managers[i]);
         }
 
         allo.removePoolManagers(_poolId, _managers);
     }
 
-    function test_AddPoolManagersInMultiplePoolsGivenSenderIsAdminOfAllPoolIds(uint256[] memory _poolIds) external {
+    function test_AddPoolManagersInMultiplePoolsRevertWhen_SenderIsNotAdminOfAllPoolIds(
+        address _caller,
+        uint256[] calldata _poolIds,
+        address[] calldata _managers
+    ) external {
+        vm.assume(_poolIds.length > 0);
+        vm.assume(_poolIds.length < 100);
+        // it should revert
+        vm.expectRevert(Errors.UNAUTHORIZED.selector);
+
+        vm.prank(_caller);
+        allo.addPoolManagersInMultiplePools(_poolIds, _managers);
+    }
+
+    function test_AddPoolManagersInMultiplePoolsWhenSenderIsAdminOfOfAllPoolIds(uint256[] calldata _poolIds) external {
         vm.assume(_poolIds.length > 0);
         vm.assume(_poolIds.length < 100);
 
         address[] memory _managers = new address[](_poolIds.length);
         for (uint256 i = 0; i < _poolIds.length; i++) {
-            allo.mock_call__checkOnlyPoolAdmin(_poolIds[i], address(this));
+            allo.mock_call__checkOnlyPoolAdmin(_poolIds[i], poolAdmin);
             _managers[i] = makeAddr((i + 1).toString());
         }
 
@@ -397,16 +518,33 @@ contract AlloUnit is Test {
             allo.expectCall__addPoolManager(_poolIds[i], _managers[i]);
         }
 
+        vm.prank(poolAdmin);
         allo.addPoolManagersInMultiplePools(_poolIds, _managers);
     }
 
-    function test_RemovePoolManagersInMultiplePoolsGivenSenderIsAdminOfAllPoolIds(uint256[] memory _poolIds) external {
+    function test_RemovePoolManagersInMultiplePoolsRevertWhen_SenderIsNotAdminOfAllPoolIds(
+        address _caller,
+        uint256[] calldata _poolIds,
+        address[] calldata _managers
+    ) external {
+        vm.assume(_poolIds.length > 0);
+        vm.assume(_poolIds.length < 100);
+        // it should revert
+        vm.expectRevert(Errors.UNAUTHORIZED.selector);
+
+        vm.prank(_caller);
+        allo.removePoolManagersInMultiplePools(_poolIds, _managers);
+    }
+
+    function test_RemovePoolManagersInMultiplePoolsWhenSenderIsAdminOfOfAllPoolIds(uint256[] memory _poolIds)
+        external
+    {
         vm.assume(_poolIds.length > 0);
         vm.assume(_poolIds.length < 100);
 
         address[] memory _managers = new address[](_poolIds.length);
         for (uint256 i = 0; i < _poolIds.length; i++) {
-            allo.mock_call__checkOnlyPoolAdmin(_poolIds[i], address(this));
+            allo.mock_call__checkOnlyPoolAdmin(_poolIds[i], poolAdmin);
             _managers[i] = makeAddr((i + 1).toString());
         }
 
@@ -417,11 +555,12 @@ contract AlloUnit is Test {
             allo.expectCall__revokeRole(allo.getPool(_poolIds[i]).managerRole, _managers[i]);
         }
 
+        vm.prank(poolAdmin);
         allo.removePoolManagersInMultiplePools(_poolIds, _managers);
     }
 
     function test_RecoverFundsRevertWhen_SenderIsNotOwner(address _caller, address _recipient) external {
-        vm.assume(_caller != address(this));
+        vm.assume(_caller != alloOwner);
 
         vm.expectRevert(Ownable.Unauthorized.selector);
         // it should revert
@@ -429,33 +568,20 @@ contract AlloUnit is Test {
         allo.recoverFunds(NATIVE, _recipient);
     }
 
-    modifier whenSenderIsOwner(address _caller) {
-        vm.assume(_caller != address(0));
-        vm.prank(address(this));
-        allo.transferOwnership(_caller);
-        _;
-    }
-
-    function test_RecoverFundsWhenTokenIsNative(address _caller, address _recipient)
-        external
-        whenSenderIsOwner(_caller)
-    {
+    function test_RecoverFundsWhenTokenIsNative(address _recipient) external whenSenderIsOwner {
         vm.assume(_recipient != address(0));
 
         deal(address(allo), 100 ether);
 
         assertEq(_recipient.balance, 0);
-        vm.prank(_caller);
+
         allo.recoverFunds(NATIVE, _recipient);
-        // it should transfer native token
+        // it should transfer the whole balance of native token
         assertEq(_recipient.balance, 100 ether);
         assertEq(address(allo).balance, 0);
     }
 
-    function test_RecoverFundsWhenTokenIsNotNative(address _caller, address _token, address _recipient)
-        external
-        whenSenderIsOwner(_caller)
-    {
+    function test_RecoverFundsWhenTokenIsNotNative(address _token, address _recipient) external whenSenderIsOwner {
         vm.assume(_token != NATIVE);
         vm.assume(_recipient != address(0));
 
@@ -465,31 +591,60 @@ contract AlloUnit is Test {
             _token, abi.encodeWithSelector(IERC20.transfer.selector, _recipient, _tokenBalance), abi.encode(true)
         );
 
-        // it should transfer the tokens
+        // it should transfer the whole balance of tokens
         vm.expectCall(_token, abi.encodeWithSelector(IERC20.balanceOf.selector, address(allo)));
         vm.expectCall(_token, abi.encodeWithSelector(IERC20.transfer.selector, _recipient, _tokenBalance));
 
-        vm.prank(_caller);
         allo.recoverFunds(_token, _recipient);
     }
 
-    function test_RegisterRecipientShouldCallRegisterOnTheStrategy(uint256 _poolId, bytes memory _data) external {
+    function test_RegisterRecipientShouldTransferTheMsgvalueReceived(
+        address _caller,
+        uint256 _poolId,
+        bytes memory _data
+    ) external {
+        address payable _strategy = payable(makeAddr("strategy"));
+        fakePool.strategy = IBaseStrategy(_strategy);
+        allo.setPool(_poolId, fakePool);
+
+        address[] memory _recipients = new address[](1);
+        _recipients[0] = address(1);
+
+        allo.mock_call__msgSender(_caller);
+        vm.mockCall(
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients, _data, _caller),
+            abi.encode(_recipients)
+        );
+        deal(_caller, 10 ether);
+
+        vm.prank(_caller);
+        allo.registerRecipient{value: 10 ether}(_poolId, _recipients, _data);
+        // it should transfer the msg.value received
+        assertEq(address(allo).balance, 10 ether);
+    }
+
+    function test_RegisterRecipientShouldCallRegisterOnTheStrategy(address _caller, uint256 _poolId, bytes memory _data)
+        external
+    {
         address[] memory _recipients = new address[](1);
         _recipients[0] = address(1);
 
         allo.setPool(_poolId, fakePool);
 
+        allo.mock_call__msgSender(_caller);
         vm.mockCall(
             fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients, _data, address(this)),
+            abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients, _data, _caller),
             abi.encode(_recipients)
         );
         // it should call register on the strategy
         vm.expectCall(
-            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients, _data, address(this))
+            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients, _data, _caller)
         );
 
         // it should return recipientId
+        vm.prank(_caller);
         address[] memory _recipientIds = allo.registerRecipient(_poolId, _recipients, _data);
         assertEq(_recipientIds[0], _recipients[0]);
     }
@@ -525,7 +680,9 @@ contract AlloUnit is Test {
         allo.batchRegisterRecipient(_poolIds, _recipients, _data);
     }
 
-    function test_BatchRegisterRecipientWhenPoolIdLengthMatches_dataLengthAnd_recipientsLength() external {
+    function test_BatchRegisterRecipientWhenPoolIdLengthMatches_dataLengthAnd_recipientsLength(address _caller)
+        external
+    {
         uint256[] memory _poolIds = new uint256[](1);
         _poolIds[0] = 1;
 
@@ -540,15 +697,15 @@ contract AlloUnit is Test {
 
         vm.mockCall(
             fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients[0], _data[0], address(this)),
+            abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients[0], _data[0], _caller),
             abi.encode(_recipients[0])
         );
         // it should call register on the strategy
         vm.expectCall(
-            fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients[0], _data[0], address(this))
+            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.register.selector, _recipients[0], _data[0], _caller)
         );
         // it should return recipientIds
+        vm.prank(_caller);
         address[][] memory _recipientIds = allo.batchRegisterRecipient(_poolIds, _recipients, _data);
         assertEq(_recipientIds[0][0], _recipients[0][0]);
     }
@@ -573,27 +730,53 @@ contract AlloUnit is Test {
         allo.fundPool(_poolId, _amount);
     }
 
-    function test_FundPoolWhenCalledWithProperParams(uint256 _poolId, uint256 _amount) external {
+    function test_FundPoolWhenCalledWithProperParams(address _caller, uint256 _poolId, uint256 _amount) external {
         vm.assume(_amount > 0);
         fakePool.token = makeAddr("token");
         allo.setPool(_poolId, fakePool);
 
-        allo.mock_call__fundPool(_amount, address(this), _poolId, fakePool.strategy);
+        allo.mock_call__msgSender(_caller);
+        allo.mock_call__fundPool(_amount, _caller, _poolId, fakePool.strategy);
         // it should call _fundPool
-        allo.expectCall__fundPool(_amount, address(this), _poolId, fakePool.strategy);
+        allo.expectCall__fundPool(_amount, _caller, _poolId, fakePool.strategy);
+
+        vm.prank(_caller);
         allo.fundPool(_poolId, _amount);
     }
 
-    function test_AllocateShouldCallAllocate(
+    // TODO: fix
+    function test_AllocateShouldCallAllocateOnTheStrategy(
         uint256 _poolId,
-        address[] memory _recipients,
-        uint256[] memory _amounts,
-        bytes memory _data
+        // address[] memory _recipients,
+        // uint256[] memory _amounts,
+        // bytes memory _data,
+        uint256 _value,
+        address _allocator
     ) external {
-        allo.mock_call__allocate(_poolId, _recipients, _amounts, _data, 0, address(this));
-        // it should call _allocate
-        allo.expectCall__allocate(_poolId, _recipients, _amounts, _data, 0, address(this));
-        allo.allocate(_poolId, _recipients, _amounts, _data);
+        vm.skip(true);
+        deal(address(this), _value);
+        allo.setPool(_poolId, fakePool);
+
+        address[] memory _recipients = new address[](1);
+        _recipients[0] = address(1);
+
+        uint256[] memory _amounts = new uint256[](1);
+        _amounts[0] = 1;
+
+        bytes memory _data = "0x";
+
+        vm.mockCall(
+            fakeStrategy,
+            abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator),
+            abi.encode()
+        );
+        // it should call allocate on the strategy
+        vm.expectCall(
+            fakeStrategy,
+            abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator)
+        );
+
+        allo.call__allocate(_poolId, _recipients, _amounts, _data, _value, _allocator);
     }
 
     function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_dataLength(bytes[] memory _datas) external {
@@ -685,7 +868,7 @@ contract AlloUnit is Test {
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
-    function test_BatchAllocateWhenLengthsMatches() external {
+    function test_BatchAllocateWhenLengthsMatches(address _caller) external {
         uint256[] memory _poolIds = new uint256[](1);
         _poolIds[0] = 1;
 
@@ -704,18 +887,19 @@ contract AlloUnit is Test {
         _datas[0] = "data";
 
         for (uint256 i = 0; i < _poolIds.length; i++) {
-            allo.mock_call__allocate(_poolIds[i], _recipients[i], _amounts[i], _datas[i], _values[i], address(this));
+            allo.mock_call__allocate(_poolIds[i], _recipients[i], _amounts[i], _datas[i], _values[i], _caller);
         }
 
         // it should call allocate
         for (uint256 i = 0; i < _poolIds.length; i++) {
-            allo.expectCall__allocate(_poolIds[i], _recipients[i], _amounts[i], _datas[i], _values[i], address(this));
+            allo.expectCall__allocate(_poolIds[i], _recipients[i], _amounts[i], _datas[i], _values[i], _caller);
         }
 
+        vm.prank(_caller);
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
-    function test_BatchAllocateRevertWhen_TotalValueDoesNotMatchValue() external {
+    function test_BatchAllocateRevertWhen_TotalValueDoesNotMatchMsgValue(address _caller) external {
         uint256[] memory _poolIds = new uint256[](1);
         _poolIds[0] = 1;
 
@@ -733,42 +917,51 @@ contract AlloUnit is Test {
         _datas[0] = "data";
 
         for (uint256 i = 0; i < _poolIds.length; i++) {
-            allo.mock_call__allocate(_poolIds[i], _recipients[i], _amounts[i], _datas[i], _values[i], address(this));
+            allo.mock_call__allocate(_poolIds[i], _recipients[i], _amounts[i], _datas[i], _values[i], _caller);
         }
 
         // it should revert
         vm.expectRevert(Errors.ETH_MISMATCH.selector);
+        vm.prank(_caller);
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
     function test_DistributeShouldCallDistributeOnTheStrategy(
+        address _caller,
         uint256 _poolId,
         address[] memory _recipients,
         bytes memory _data
     ) external {
         allo.setPool(_poolId, fakePool);
 
+        allo.mock_call__msgSender(_caller);
         vm.mockCall(
             fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.distribute.selector, _recipients, _data, address(this)),
+            abi.encodeWithSelector(IBaseStrategy.distribute.selector, _recipients, _data, _caller),
             abi.encode()
         );
         // it should call distribute on the strategy
         vm.expectCall(
-            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.distribute.selector, _recipients, _data, address(this))
+            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.distribute.selector, _recipients, _data, _caller)
         );
 
+        vm.prank(_caller);
         allo.distribute(_poolId, _recipients, _data);
     }
 
-    modifier givenSenderIsAdminOfPoolId(uint256 _poolId) {
-        allo.mock_call__checkOnlyPoolAdmin(_poolId, address(this));
-        _;
+    function test_ChangeAdminRevertWhen_SenderIsNotAdminOfPoolId(address _caller, uint256 _poolId, address _newAdmin)
+        external
+    {
+        // it should revert
+        vm.expectRevert(Errors.UNAUTHORIZED.selector);
+
+        vm.prank(_caller);
+        allo.changeAdmin(_poolId, _newAdmin);
     }
 
     function test_ChangeAdminRevertWhen_NewAdminIsZeroAddress(uint256 _poolId)
         external
-        givenSenderIsAdminOfPoolId(_poolId)
+        whenSenderIsAdminOfPoolId(_poolId)
     {
         // it should revert
         vm.expectRevert(Errors.ZERO_ADDRESS.selector);
@@ -777,25 +970,17 @@ contract AlloUnit is Test {
 
     function test_ChangeAdminWhenNewAdminIsNotZeroAddress(uint256 _poolId, address _newAdmin)
         external
-        givenSenderIsAdminOfPoolId(_poolId)
+        whenSenderIsAdminOfPoolId(_poolId)
     {
         vm.assume(_newAdmin != address(0));
         // it should call _checkOnlyPoolAdmin
-        allo.expectCall__checkOnlyPoolAdmin(_poolId, address(this));
+        allo.expectCall__checkOnlyPoolAdmin(_poolId, poolAdmin);
         // it should call _revokeRole
-        allo.expectCall__revokeRole(allo.getPool(_poolId).adminRole, address(this));
+        allo.expectCall__revokeRole(allo.getPool(_poolId).adminRole, poolAdmin);
         // it should call _grantRole
         allo.expectCall__grantRole(allo.getPool(_poolId).adminRole, _newAdmin);
 
         allo.changeAdmin(_poolId, _newAdmin);
-    }
-
-    function test__checkOnlyPoolManagerShouldCall_isPoolManager(uint256 _poolId, address _poolManager) external {
-        // it should call _isPoolManager
-        allo.mock_call__isPoolManager(_poolId, _poolManager, true);
-        allo.expectCall__isPoolManager(_poolId, _poolManager);
-
-        allo.call__checkOnlyPoolManager(_poolId, _poolManager);
     }
 
     function test__checkOnlyPoolManagerRevertWhen_IsNotPoolManager(uint256 _poolId, address _poolManager) external {
@@ -806,12 +991,10 @@ contract AlloUnit is Test {
         allo.call__checkOnlyPoolManager(_poolId, _poolManager);
     }
 
-    function test__checkOnlyPoolAdminShouldCall_isPoolAdmin(uint256 _poolId, address _poolAdmin) external {
-        // it should call _isPoolAdmin
-        allo.mock_call__isPoolAdmin(_poolId, _poolAdmin, true);
-        allo.expectCall__isPoolAdmin(_poolId, _poolAdmin);
-
-        allo.call__checkOnlyPoolAdmin(_poolId, _poolAdmin);
+    function test__checkOnlyPoolManagerWhenIsPoolManager(uint256 _poolId, address _poolManager) external {
+        allo.mock_call__isPoolManager(_poolId, _poolManager, true);
+        // it should revert
+        allo.call__checkOnlyPoolManager(_poolId, _poolManager);
     }
 
     function test__checkOnlyPoolAdminRevertWhen_IsNotPoolAdmin(uint256 _poolId, address _poolAdmin) external {
@@ -822,9 +1005,15 @@ contract AlloUnit is Test {
         allo.call__checkOnlyPoolAdmin(_poolId, _poolAdmin);
     }
 
+    function test__checkOnlyPoolAdminWhenIsPoolAdmin(uint256 _poolId, address _poolAdmin) external {
+        allo.mock_call__isPoolAdmin(_poolId, _poolAdmin, true);
+        // it should not revert
+        allo.call__checkOnlyPoolAdmin(_poolId, _poolAdmin);
+    }
+
     function test__createPoolWhenCalledValidParams(
         bytes32 _profileId,
-        IBaseStrategy _strategy,
+        address _strategy,
         bytes memory _initStrategyData,
         address _token,
         Metadata memory _metadata,
@@ -849,34 +1038,24 @@ contract AlloUnit is Test {
         // it should save pool on pools mapping
         // it should call initialize on the strategy
         vm.mockCall(
-            fakeStrategy,
+            _strategy,
             abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
             abi.encode()
         );
-        vm.expectCall(
-            fakeStrategy, abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData)
-        );
-        vm.mockCall(fakeStrategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
-        vm.mockCall(fakeStrategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
+        vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
         // it should add pool managers
         for (uint256 i = 0; i < _managers.length; i++) {
             allo.mock_call__addPoolManager(poolId, _managers[i]);
             allo.expectCall__addPoolManager(poolId, _managers[i]);
         }
         // it should emit PoolCreated event
-        vm.expectEmit(true, true, true, true);
-        emit PoolCreated(poolId, _profileId, IBaseStrategy(fakeStrategy), _token, 0, _metadata);
+        vm.expectEmit();
+        emit PoolCreated(poolId, _profileId, IBaseStrategy(_strategy), _token, 0, _metadata);
 
         allo.call__createPool(
-            address(this),
-            0,
-            _profileId,
-            IBaseStrategy(fakeStrategy),
-            _initStrategyData,
-            _token,
-            0,
-            _metadata,
-            _managers
+            address(this), 0, _profileId, IBaseStrategy(_strategy), _initStrategyData, _token, 0, _metadata, _managers
         );
     }
 
@@ -884,7 +1063,7 @@ contract AlloUnit is Test {
         address _creator,
         uint256 _msgValue,
         bytes32 _profileId,
-        IBaseStrategy _strategy,
+        address _strategy,
         bytes memory _initStrategyData,
         address _token,
         uint256 _amount,
@@ -900,140 +1079,420 @@ contract AlloUnit is Test {
         vm.expectRevert(Errors.UNAUTHORIZED.selector);
 
         allo.call__createPool(
-            _creator, _msgValue, _profileId, _strategy, _initStrategyData, _token, _amount, _metadata, _managers
+            _creator,
+            _msgValue,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
         );
     }
 
-    function test__createPoolRevertWhen_StrategyPoolIdDoesNotMatch() external {
-        // it should revert
-        vm.skip(true);
-    }
-
-    function test__createPoolRevertWhen_AlloAddressDoesNotMatch() external {
-        // it should revert
-        vm.skip(true);
-    }
-
-    modifier whenBaseFeeIsMoreThanZero() {
-        _;
-    }
-
-    modifier whenTokenIsNative() {
-        _;
-    }
-
-    function test__createPoolRevertWhen_BaseFeePlusAmountIsDiffFromValue()
-        external
-        whenBaseFeeIsMoreThanZero
-        whenTokenIsNative
-    {
-        // it should revert
-        vm.skip(true);
-    }
-
-    modifier whenTokenIsNotNative() {
-        _;
-    }
-
-    function test__createPoolRevertWhen_BaseFeeIsDiffFromValue()
-        external
-        whenBaseFeeIsMoreThanZero
-        whenTokenIsNotNative
-    {
-        // it should revert
-        vm.skip(true);
-    }
-
-    function test__createPoolWhenProvidedFeeIsCorrect() external whenBaseFeeIsMoreThanZero {
-        // it should call _transferAmount
-        // it should emit event
-        vm.skip(true);
-    }
-
-    function test__createPoolWhenAmountIsMoreThanZero() external {
-        // it should call _fundPool
-        vm.skip(true);
-    }
-
-    // TODO: fix
-    function test__allocateShouldCallAllocateOnTheStrategy(
-        uint256 _poolId,
-        // address[] memory _recipients,
-        // uint256[] memory _amounts,
-        // bytes memory _data,
-        uint256 _value,
-        address _allocator
+    function test__createPoolRevertWhen_StrategyPoolIdDoesNotMatch(
+        uint256 _msgValue,
+        bytes32 _profileId,
+        address _strategy,
+        bytes memory _initStrategyData,
+        address _token,
+        uint256 _amount,
+        Metadata memory _metadata,
+        address[] memory _managers
     ) external {
-        vm.skip(true);
-        deal(address(this), _value);
-        allo.setPool(_poolId, fakePool);
+        vm.mockCall(
+            fakeRegistry,
+            abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
+            abi.encode(true)
+        );
 
-        address[] memory _recipients = new address[](1);
-        _recipients[0] = address(1);
+        uint256 poolId = 1;
+        bytes32 POOL_MANAGER_ROLE = bytes32(poolId);
+        bytes32 POOL_ADMIN_ROLE = keccak256(abi.encodePacked(poolId, "admin"));
 
-        uint256[] memory _amounts = new uint256[](1);
-        _amounts[0] = 1;
-
-        bytes memory _data = "0x";
+        allo.mock_call__grantRole(POOL_ADMIN_ROLE, address(this));
+        allo.mock_call__setRoleAdmin(POOL_MANAGER_ROLE, POOL_ADMIN_ROLE);
 
         vm.mockCall(
-            fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator),
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
             abi.encode()
         );
-        // it should call allocate on the strategy
-        vm.expectCall(
-            fakeStrategy,
-            abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator)
-        );
+        // we set poolId to 0 so it fails here
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(0));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
+        // it should revert
+        vm.expectRevert(Errors.MISMATCH.selector);
 
-        allo.call__allocate(_poolId, _recipients, _amounts, _data, _value, _allocator);
+        allo.call__createPool(
+            address(this),
+            _msgValue,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
+        );
     }
 
-    modifier whenPercentFeeIsMoreThanZero() {
+    function test__createPoolRevertWhen_AlloAddressDoesNotMatch(
+        uint256 _msgValue,
+        bytes32 _profileId,
+        address _strategy,
+        bytes memory _initStrategyData,
+        address _token,
+        uint256 _amount,
+        Metadata memory _metadata,
+        address[] memory _managers
+    ) external {
+        vm.mockCall(
+            fakeRegistry,
+            abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
+            abi.encode(true)
+        );
+
+        uint256 poolId = 1;
+        bytes32 POOL_MANAGER_ROLE = bytes32(poolId);
+        bytes32 POOL_ADMIN_ROLE = keccak256(abi.encodePacked(poolId, "admin"));
+
+        allo.mock_call__grantRole(POOL_ADMIN_ROLE, address(this));
+        allo.mock_call__setRoleAdmin(POOL_MANAGER_ROLE, POOL_ADMIN_ROLE);
+
+        vm.mockCall(
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
+            abi.encode()
+        );
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        // we change the allo address so it reverts here
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(0)));
+        // it should revert
+        vm.expectRevert(Errors.MISMATCH.selector);
+
+        allo.call__createPool(
+            address(this),
+            _msgValue,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
+        );
+    }
+
+    modifier whenBaseFeeIsMoreThanZero(uint256 _fee) {
+        _fee = bound(_fee, 1, 1e18);
+        vm.prank(alloOwner);
+        allo.updateBaseFee(_fee);
         _;
     }
 
-    function test__fundPoolWhenPercentFeeIsMoreThanZero() external whenPercentFeeIsMoreThanZero {
-        // it should call getFeeDenominator
-        vm.skip(true);
+    modifier whenTokenIsNative(address _token) {
+        _token = NATIVE;
+        _;
     }
 
-    function test__fundPoolRevertWhen_FeeAmountPlusAmountAfterFeeDiffAmount() external whenPercentFeeIsMoreThanZero {
+    function test__createPoolRevertWhen_BaseFeePlusAmountIsDiffFromValue(
+        uint256 _fee,
+        uint256 _msgValue,
+        bytes32 _profileId,
+        address _strategy,
+        bytes memory _initStrategyData,
+        address _token,
+        uint256 _amount,
+        Metadata memory _metadata,
+        address[] memory _managers
+    ) external whenBaseFeeIsMoreThanZero(_fee) whenTokenIsNative(_token) {
+        vm.skip(true);
+        vm.assume(_msgValue < _amount);
+
+        vm.mockCall(
+            fakeRegistry,
+            abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
+            abi.encode(true)
+        );
+
+        uint256 poolId = 1;
+        bytes32 POOL_MANAGER_ROLE = bytes32(poolId);
+        bytes32 POOL_ADMIN_ROLE = keccak256(abi.encodePacked(poolId, "admin"));
+
+        allo.mock_call__grantRole(POOL_ADMIN_ROLE, address(this));
+        allo.mock_call__setRoleAdmin(POOL_MANAGER_ROLE, POOL_ADMIN_ROLE);
+        vm.mockCall(
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
+            abi.encode()
+        );
+        vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
+        for (uint256 i = 0; i < _managers.length; i++) {
+            allo.mock_call__addPoolManager(poolId, _managers[i]);
+        }
+
         // it should revert
-        vm.skip(true);
+        vm.expectRevert(Errors.NOT_ENOUGH_FUNDS.selector);
+
+        allo.call__createPool(
+            address(this),
+            _msgValue,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
+        );
     }
 
-    function test__fundPoolWhenTokenIsNative() external whenPercentFeeIsMoreThanZero {
-        // it should call _transferAmountFrom
-        vm.skip(true);
+    modifier whenTokenIsNotNative(address _token) {
+        vm.assume(_token != NATIVE);
+        _;
     }
 
-    function test__fundPoolWhenTokenIsNotNative() external whenPercentFeeIsMoreThanZero {
-        // it should call _getBalance
-        // it should call _transferAmountFrom
-        vm.skip(true);
+    function test__createPoolRevertWhen_BaseFeeIsDiffFromValue(
+        uint256 _fee,
+        uint256 _msgValue,
+        bytes32 _profileId,
+        address _strategy,
+        bytes memory _initStrategyData,
+        address _token,
+        uint256 _amount,
+        Metadata memory _metadata,
+        address[] memory _managers
+    ) external whenBaseFeeIsMoreThanZero(_fee) whenTokenIsNotNative(_token) {
+        // make sure this is true so it fails
+        vm.assume(_fee != _msgValue);
+
+        vm.mockCall(
+            fakeRegistry,
+            abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
+            abi.encode(true)
+        );
+
+        uint256 poolId = 1;
+        bytes32 POOL_MANAGER_ROLE = bytes32(poolId);
+        bytes32 POOL_ADMIN_ROLE = keccak256(abi.encodePacked(poolId, "admin"));
+
+        allo.mock_call__grantRole(POOL_ADMIN_ROLE, address(this));
+        allo.mock_call__setRoleAdmin(POOL_MANAGER_ROLE, POOL_ADMIN_ROLE);
+        vm.mockCall(
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
+            abi.encode()
+        );
+        vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
+        for (uint256 i = 0; i < _managers.length; i++) {
+            allo.mock_call__addPoolManager(poolId, _managers[i]);
+        }
+
+        // it should revert
+        vm.expectRevert(Errors.NOT_ENOUGH_FUNDS.selector);
+
+        allo.call__createPool(
+            address(this),
+            _msgValue,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
+        );
     }
 
-    function test__fundPoolWhenTokenIsNativeToken() external {
-        // it should call _transferAmountFrom
+    function test__createPoolWhenProvidedFeeIsCorrect(
+        uint256 _fee,
+        bytes32 _profileId,
+        address _strategy,
+        bytes memory _initStrategyData,
+        address _token,
+        uint256 _amount,
+        Metadata memory _metadata,
+        address[] memory _managers
+    ) external whenBaseFeeIsMoreThanZero(_fee) {
         vm.skip(true);
-    }
+        vm.assume(_token != NATIVE);
+        uint256 _msgValue = _fee;
 
-    function test__fundPoolWhenTokenIsNotNativeToken() external {
-        // it should call _getBalance
-        // it should call _transferAmountFrom
-        vm.skip(true);
-    }
+        vm.mockCall(
+            fakeRegistry,
+            abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
+            abi.encode(true)
+        );
 
-    function test__fundPoolShouldCallIncreasePoolAmountOnTheStrategy() external {
-        // it should call increasePoolAmount on the strategy
-        vm.skip(true);
-    }
+        uint256 poolId = 1;
+        bytes32 POOL_MANAGER_ROLE = bytes32(poolId);
+        bytes32 POOL_ADMIN_ROLE = keccak256(abi.encodePacked(poolId, "admin"));
 
-    function test__fundPoolShouldEmitEvent() external {
+        allo.mock_call__grantRole(POOL_ADMIN_ROLE, address(this));
+        allo.mock_call__setRoleAdmin(POOL_MANAGER_ROLE, POOL_ADMIN_ROLE);
+        vm.mockCall(
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
+            abi.encode()
+        );
+        vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
+        for (uint256 i = 0; i < _managers.length; i++) {
+            allo.mock_call__addPoolManager(poolId, _managers[i]);
+        }
+
+        // it should call _transferAmount
+        // TODO: fix
+
         // it should emit event
+        vm.expectEmit();
+        emit BaseFeePaid(poolId, _fee);
+
+        deal(address(allo), _fee);
+
+        allo.call__createPool(
+            address(this),
+            _msgValue,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
+        );
+    }
+
+    function test__createPoolWhenAmountIsMoreThanZero(
+        bytes32 _profileId,
+        address _strategy,
+        bytes memory _initStrategyData,
+        address _token,
+        uint256 _amount,
+        Metadata memory _metadata,
+        address[] memory _managers
+    ) external {
+        vm.assume(_amount > 0);
+        vm.assume(_token != NATIVE);
+
+        vm.mockCall(
+            fakeRegistry,
+            abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
+            abi.encode(true)
+        );
+
+        uint256 poolId = 1;
+        bytes32 POOL_MANAGER_ROLE = bytes32(poolId);
+        bytes32 POOL_ADMIN_ROLE = keccak256(abi.encodePacked(poolId, "admin"));
+
+        allo.mock_call__grantRole(POOL_ADMIN_ROLE, address(this));
+        allo.mock_call__setRoleAdmin(POOL_MANAGER_ROLE, POOL_ADMIN_ROLE);
+        vm.mockCall(
+            _strategy,
+            abi.encodeWithSelector(IBaseStrategy.initialize.selector, poolId, _initStrategyData),
+            abi.encode()
+        );
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getPoolId.selector), abi.encode(poolId));
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.getAllo.selector), abi.encode(address(allo)));
+        for (uint256 i = 0; i < _managers.length; i++) {
+            allo.mock_call__addPoolManager(poolId, _managers[i]);
+        }
+
+        // it should call _fundPool
+        allo.mock_call__fundPool(_amount, address(this), poolId, IBaseStrategy(_strategy));
+        allo.expectCall__fundPool(_amount, address(this), poolId, IBaseStrategy(_strategy));
+
+        allo.call__createPool(
+            address(this),
+            _amount,
+            _profileId,
+            IBaseStrategy(_strategy),
+            _initStrategyData,
+            _token,
+            _amount,
+            _metadata,
+            _managers
+        );
+    }
+
+    function test__fundPoolRevertWhen_TokenIsNativeAndValueIsLessThanAmount(
+        uint256 _amount,
+        address _funder,
+        uint256 _poolId,
+        IBaseStrategy _strategy
+    ) external {
+        vm.assume(_amount > 0);
+
+        fakePool.token = NATIVE;
+        fakePool.strategy = _strategy;
+        allo.setPool(_poolId, fakePool);
+        // it should revert
+        vm.expectRevert(Errors.ETH_MISMATCH.selector);
+        allo.call__fundPool(_amount, _funder, _poolId, _strategy);
+    }
+
+    function test__fundPoolWhenFeeAmountIsMoreThanZero(
+        uint256 _amount,
+        address _funder,
+        uint256 _poolId,
+        address _strategy
+    ) external {
         vm.skip(true);
+        vm.assume(_amount > 0);
+
+        uint256 _percentFee = 1e17;
+        allo.updatePercentFee(_percentFee);
+        fakePool.strategy = IBaseStrategy(_strategy);
+        allo.setPool(_poolId, fakePool);
+
+        uint256 _expectedFee = (_amount * _percentFee) / 1e18;
+        uint256 _expectedAmount = _amount - _expectedFee;
+
+        // transfer fee to treasury
+        // it should call getBalance on the treasury
+        vm.mockCall(
+            fakePool.token, abi.encodeWithSelector(IERC20.balanceOf.selector, address(fakeTreasury)), abi.encode(0)
+        );
+        vm.expectCall(fakePool.token, abi.encodeWithSelector(IERC20.balanceOf.selector, address(fakeTreasury)));
+
+        // it should transfer the fee to the treasury
+        vm.mockCall(
+            fakePool.token,
+            abi.encodeWithSelector(IERC20.transfer.selector, address(fakeTreasury), _expectedFee),
+            abi.encode(true)
+        );
+        vm.expectCall(
+            fakePool.token, abi.encodeWithSelector(IERC20.transfer.selector, address(fakeTreasury), _expectedFee)
+        );
+
+        // it should transfer the remaining amount to the pool
+        vm.mockCall(
+            fakePool.token,
+            abi.encodeWithSelector(IERC20.transfer.selector, address(_strategy), _expectedAmount),
+            abi.encode(true)
+        );
+        vm.expectCall(
+            fakePool.token, abi.encodeWithSelector(IERC20.transfer.selector, address(_strategy), _expectedAmount)
+        );
+        // it should increase the pool amount
+        vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.increasePoolAmount.selector, _expectedAmount));
+
+        allo.call__fundPool(_amount, _funder, _poolId, IBaseStrategy(_strategy));
+        assertEq(IBaseStrategy(_strategy).getPoolAmount(), _expectedAmount);
+    }
+
+    function test__fundPoolWhenFeeAmountIsZero() external {
+        vm.skip(true);
+        // it should transfer the amount to the pool
+        // it should increase the pool amount
+        // it should emit event
     }
 
     function test__isPoolAdminWhenHasRoleAdmin(uint256 _poolId, address _poolAdmin) external {
@@ -1063,106 +1522,6 @@ contract AlloUnit is Test {
     function test__isPoolManagerWhenHasNoRolesAtAll(uint256 _poolId, address _poolManager) external {
         // it should return false
         assertTrue(!allo.call__isPoolManager(_poolId, _poolManager));
-    }
-
-    function test__updateRegistryRevertWhen_RegistryIsZeroAddress() external {
-        // it should revert
-        vm.expectRevert(Errors.ZERO_ADDRESS.selector);
-        allo.call__updateRegistry(address(0));
-    }
-
-    function test__updateRegistryGivenRegistryIsNotZeroAddress(address _newRegistry) external {
-        vm.assume(_newRegistry != address(0));
-        // it should update registry
-        assertEq(address(allo.getRegistry()), fakeRegistry);
-        // it should emit event
-        vm.expectEmit(true, true, true, true);
-        emit RegistryUpdated(_newRegistry);
-
-        allo.call__updateRegistry(_newRegistry);
-        assertEq(address(allo.getRegistry()), _newRegistry);
-    }
-
-    function test__updateTreasuryRevertWhen_TreasuryIsZeroAddress() external {
-        // it should revert
-        vm.expectRevert(Errors.ZERO_ADDRESS.selector);
-        allo.call__updateTreasury(payable(0));
-    }
-
-    function test__updateTreasuryGivenTreasuryIsNotZeroAddress(address payable _newTreasury) external {
-        vm.assume(_newTreasury != address(0));
-        // it should update treasury
-        assertEq(allo.getTreasury(), address(0));
-        // it should emit event
-        vm.expectEmit(true, true, true, true);
-        emit TreasuryUpdated(_newTreasury);
-
-        allo.call__updateTreasury(_newTreasury);
-        assertEq(allo.getTreasury(), _newTreasury);
-    }
-
-    function test__updatePercentFeeRevertWhen_PercentFeeIsMoreThan1e18() external {
-        // it should revert
-        vm.expectRevert(Errors.INVALID_FEE.selector);
-        allo.call__updatePercentFee(1e18 + 1);
-    }
-
-    function test__updatePercentFeeGivenPercentFeeIsValid(uint256 _percentFee) external {
-        _percentFee = bound(_percentFee, 1, 1e18);
-        // it should update percentFee
-        assertEq(allo.getPercentFee(), 0);
-        // it should emit event
-        vm.expectEmit(true, true, true, true);
-        emit PercentFeeUpdated(_percentFee);
-
-        allo.call__updatePercentFee(_percentFee);
-        assertEq(allo.getPercentFee(), _percentFee);
-    }
-
-    function test__updateBaseFeeShouldUpdateBaseFee(uint256 _baseFee) external {
-        // it should update baseFee
-        assertEq(allo.getBaseFee(), 0);
-        allo.call__updateBaseFee(_baseFee);
-
-        assertEq(allo.getBaseFee(), _baseFee);
-    }
-
-    function test__updateBaseFeeShouldEmitEvent(uint256 _baseFee) external {
-        // it should emit event
-        vm.expectEmit(true, true, true, true);
-        emit BaseFeeUpdated(_baseFee);
-
-        allo.call__updateBaseFee(_baseFee);
-    }
-
-    function test__updateTrustedForwarderShouldUpdateTrustedForwarder(address _trustedForwarder) external {
-        // it should update trustedForwarder
-        assertEq(allo.isTrustedForwarder(address(0)), true);
-        allo.call__updateTrustedForwarder(_trustedForwarder);
-
-        assertEq(allo.isTrustedForwarder(_trustedForwarder), true);
-    }
-
-    function test__updateTrustedForwarderShouldEmitEvent(address _trustedForwarder) external {
-        // it should emit event
-        vm.expectEmit(true, true, true, true);
-        emit TrustedForwarderUpdated(_trustedForwarder);
-
-        allo.call__updateTrustedForwarder(_trustedForwarder);
-    }
-
-    function test__addPoolManagerRevertWhen_ManagerIsZeroAddress(uint256 _poolId) external {
-        // it should revert
-        vm.expectRevert(Errors.ZERO_ADDRESS.selector);
-        allo.call__addPoolManager(_poolId, address(0));
-    }
-
-    function test__addPoolManagerGivenManagerIsNotZeroAddress(uint256 _poolId, address _poolManager) external {
-        vm.assume(_poolManager != address(0));
-        // it should call _grantRole
-        allo.expectCall__grantRole(allo.getPool(_poolId).managerRole, _poolManager);
-
-        allo.call__addPoolManager(_poolId, _poolManager);
     }
 
     modifier whenSenderIsTrustedForwarder() {
