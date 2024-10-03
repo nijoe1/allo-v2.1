@@ -559,6 +559,7 @@ contract AlloUnit is Test {
 
     function test_RecoverFundsWhenTokenIsNative(address _recipient) external whenSenderIsOwner {
         vm.assume(_recipient != address(0));
+        vm.assume(_recipient.code.length == 0);
 
         deal(address(allo), 100 ether);
 
@@ -1085,6 +1086,8 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external {
+        vm.assume(_strategy != address(vm));
+
         vm.mockCall(
             fakeRegistry,
             abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
@@ -1132,6 +1135,8 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external {
+        vm.assume(_strategy != address(vm));
+
         vm.mockCall(
             fakeRegistry,
             abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
@@ -1190,6 +1195,7 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero whenTokenIsNative(_token) {
+        vm.assume(_strategy != address(vm));
         vm.assume(_msgValue < _amount);
 
         vm.mockCall(
@@ -1247,6 +1253,8 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero whenTokenIsNotNative(_token) {
+        vm.assume(_strategy != address(vm));
+
         uint256 _fee = 1 ether;
         // make sure this is true so it fails
         vm.assume(_fee != _msgValue);
@@ -1300,7 +1308,16 @@ contract AlloUnit is Test {
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero {
         vm.assume(_strategy != address(0));
+        vm.assume(_strategy != address(vm));
+        vm.assume(_strategy != address(this));
+        vm.assume(_strategy != address(allo));
         vm.assume(_token != NATIVE);
+        vm.assume(_token != address(vm));
+        vm.assume(_token != address(fakeToken));
+        vm.assume(_token != address(allo));
+        vm.assume(_token != address(this));
+        assumeNotPrecompile(_strategy);
+
         uint256 _fee = 1 ether;
         uint256 _msgValue = _fee;
 
@@ -1423,6 +1440,7 @@ contract AlloUnit is Test {
         vm.assume(_funder != address(0));
         vm.assume(_amount < type(uint256).max / _percentFee);
         vm.assume(_amount * _percentFee > 1e18);
+        vm.assume(_funder != _strategy);
 
         fakePool.token = address(fakeToken);
         deal(address(fakeToken), _funder, _amount);
@@ -1470,6 +1488,7 @@ contract AlloUnit is Test {
         vm.assume(_strategy != address(vm));
         vm.assume(_funder != address(0));
         vm.assume(_amount > 0);
+        vm.assume(_funder != _strategy);
 
         fakePool.token = address(fakeToken);
         deal(address(fakeToken), _funder, _amount);
