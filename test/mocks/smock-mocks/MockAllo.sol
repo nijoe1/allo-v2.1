@@ -54,11 +54,11 @@ contract MockAllo is Allo {
         uint256 _poolId,
         address[] memory _recipients,
         uint256[] memory _amounts,
-        bytes memory _data,
+        bytes memory __data,
         uint256 _value,
         address _allocator
     ) internal virtual override {
-        super._allocate(_poolId, _recipients, _amounts, _data, _value, _allocator);
+        super._allocate(_poolId, _recipients, _amounts, __data, _value, _allocator);
     }
 
     function _fundPool(uint256 _amount, address _funder, uint256 _poolId, IBaseStrategy _strategy)

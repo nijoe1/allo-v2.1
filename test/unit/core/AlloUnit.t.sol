@@ -730,17 +730,10 @@ contract AlloUnit is Test {
         allo.fundPool(_poolId, _amount);
     }
 
-    // TODO: fix
-    function test_AllocateShouldCallAllocateOnTheStrategy(
-        uint256 _poolId,
-        // address[] memory _recipients,
-        // uint256[] memory _amounts,
-        // bytes memory _data,
-        uint256 _value,
-        address _allocator
-    ) external {
-        vm.skip(true);
-        deal(address(this), _value);
+    function test_AllocateShouldCallAllocateOnTheStrategy(uint256 _poolId, uint256 _value, address _allocator)
+        external
+    {
+        deal(_allocator, _value);
         allo.setPool(_poolId, fakePool);
 
         address[] memory _recipients = new address[](1);
@@ -759,10 +752,12 @@ contract AlloUnit is Test {
         // it should call allocate on the strategy
         vm.expectCall(
             fakeStrategy,
+            _value,
             abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator)
         );
 
-        allo.call__allocate(_poolId, _recipients, _amounts, _data, _value, _allocator);
+        vm.prank(_allocator);
+        allo.allocate{value: _value}(_poolId, _recipients, _amounts, _data);
     }
 
     function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_dataLength(bytes[] memory _datas) external {
