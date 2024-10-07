@@ -213,12 +213,16 @@ contract AlloUnit is Test {
             _managers
         );
 
+        assertEq(allo.getNonce(_creator), 0);
+
         deal(_creator, _msgValue);
         vm.prank(_creator);
         uint256 poolId = allo.createPool{value: _msgValue}(
             _profileId, address(_strategy), _initStrategyData, _token, _amount, _metadata, _managers
         );
 
+        // it should increment the _nonces of the creator
+        assertEq(allo.getNonce(_creator), 1);
         // it should return poolId
         assertEq(poolId, _poolId);
     }
