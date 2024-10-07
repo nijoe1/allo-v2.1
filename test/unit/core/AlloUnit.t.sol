@@ -12,6 +12,7 @@ import {ClonesUpgradeable} from "openzeppelin-contracts-upgradeable/contracts/pr
 import {Ownable} from "solady/auth/Ownable.sol";
 import {LibString} from "solady/utils/LibString.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {MockToken} from "test/mocks/MockToken.sol";
 
 contract AlloUnit is Test {
     using LibString for uint256;
@@ -28,9 +29,11 @@ contract AlloUnit is Test {
     address public poolManager;
     address public trustedForwarder;
     IAllo.Pool public fakePool;
+    MockToken public fakeToken;
 
     function setUp() public virtual {
         allo = new MockMockAllo();
+        fakeToken = new MockToken("MockToken", "MTK");
         fakeStrategy = makeAddr("fakeStrategy");
         fakePool = IAllo.Pool({
             profileId: keccak256("profileId"),
@@ -556,6 +559,7 @@ contract AlloUnit is Test {
 
     function test_RecoverFundsWhenTokenIsNative(address _recipient) external whenSenderIsOwner {
         vm.assume(_recipient != address(0));
+        vm.assume(_recipient.code.length == 0);
 
         deal(address(allo), 100 ether);
 
@@ -730,17 +734,10 @@ contract AlloUnit is Test {
         allo.fundPool(_poolId, _amount);
     }
 
-    // TODO: fix
-    function test_AllocateShouldCallAllocateOnTheStrategy(
-        uint256 _poolId,
-        // address[] memory _recipients,
-        // uint256[] memory _amounts,
-        // bytes memory _data,
-        uint256 _value,
-        address _allocator
-    ) external {
-        vm.skip(true);
-        deal(address(this), _value);
+    function test_AllocateShouldCallAllocateOnTheStrategy(uint256 _poolId, uint256 _value, address _allocator)
+        external
+    {
+        deal(_allocator, _value);
         allo.setPool(_poolId, fakePool);
 
         address[] memory _recipients = new address[](1);
@@ -759,10 +756,12 @@ contract AlloUnit is Test {
         // it should call allocate on the strategy
         vm.expectCall(
             fakeStrategy,
+            _value,
             abi.encodeWithSelector(IBaseStrategy.allocate.selector, _recipients, _amounts, _data, _allocator)
         );
 
-        allo.call__allocate(_poolId, _recipients, _amounts, _data, _value, _allocator);
+        vm.prank(_allocator);
+        allo.allocate{value: _value}(_poolId, _recipients, _amounts, _data);
     }
 
     function test_BatchAllocateRevertWhen_PoolIdLengthDoesNotMatch_dataLength(bytes[] memory _datas) external {
@@ -1087,6 +1086,8 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external {
+        vm.assume(_strategy != address(vm));
+
         vm.mockCall(
             fakeRegistry,
             abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
@@ -1134,6 +1135,8 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external {
+        vm.assume(_strategy != address(vm));
+
         vm.mockCall(
             fakeRegistry,
             abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
@@ -1192,6 +1195,7 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero whenTokenIsNative(_token) {
+        vm.assume(_strategy != address(vm));
         vm.assume(_msgValue < _amount);
 
         vm.mockCall(
@@ -1249,6 +1253,8 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero whenTokenIsNotNative(_token) {
+        vm.assume(_strategy != address(vm));
+
         uint256 _fee = 1 ether;
         // make sure this is true so it fails
         vm.assume(_fee != _msgValue);
@@ -1302,7 +1308,16 @@ contract AlloUnit is Test {
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero {
         vm.assume(_strategy != address(0));
+        vm.assume(_strategy != address(vm));
+        vm.assume(_strategy != address(this));
+        vm.assume(_strategy != address(allo));
         vm.assume(_token != NATIVE);
+        vm.assume(_token != address(vm));
+        vm.assume(_token != address(fakeToken));
+        vm.assume(_token != address(allo));
+        vm.assume(_token != address(this));
+        assumeNotPrecompile(_strategy);
+
         uint256 _fee = 1 ether;
         uint256 _msgValue = _fee;
 
@@ -1419,10 +1434,19 @@ contract AlloUnit is Test {
         uint256 _poolId,
         address _strategy
     ) external {
-        vm.skip(true);
-        vm.assume(_amount > 0);
-
         uint256 _percentFee = 1e17;
+        vm.assume(_strategy != address(0));
+        vm.assume(_strategy != address(vm));
+        vm.assume(_funder != address(0));
+        vm.assume(_amount < type(uint256).max / _percentFee);
+        vm.assume(_amount * _percentFee > 1e18);
+        vm.assume(_funder != _strategy);
+
+        fakePool.token = address(fakeToken);
+        deal(address(fakeToken), _funder, _amount);
+        vm.prank(_funder);
+        fakeToken.approve(address(allo), type(uint256).max);
+
         vm.prank(alloOwner);
         allo.updatePercentFee(_percentFee);
         fakePool.strategy = IBaseStrategy(_strategy);
@@ -1431,67 +1455,54 @@ contract AlloUnit is Test {
         uint256 _expectedFee = (_amount * _percentFee) / 1e18;
         uint256 _expectedAmount = _amount - _expectedFee;
 
+        vm.mockCall(
+            _strategy, abi.encodeWithSelector(IBaseStrategy.increasePoolAmount.selector, _expectedAmount), abi.encode()
+        );
+
         // transfer fee to treasury
         // it should call getBalance on the treasury
-        vm.mockCall(
-            fakePool.token, abi.encodeWithSelector(IERC20.balanceOf.selector, address(fakeTreasury)), abi.encode(0)
-        );
         vm.expectCall(fakePool.token, abi.encodeWithSelector(IERC20.balanceOf.selector, address(fakeTreasury)));
 
         // it should transfer the fee to the treasury
-        vm.mockCall(
-            fakePool.token,
-            abi.encodeWithSelector(IERC20.transfer.selector, address(fakeTreasury), _expectedFee),
-            abi.encode(true)
-        );
         vm.expectCall(
-            fakePool.token, abi.encodeWithSelector(IERC20.transfer.selector, address(fakeTreasury), _expectedFee)
-        );
-
-        // TODO: 2nd call of balanceOf should return the expectedFee that was transfered
-        vm.mockCall(
             fakePool.token,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(fakeTreasury)),
-            abi.encode(_expectedFee)
+            abi.encodeWithSelector(IERC20.transferFrom.selector, _funder, address(fakeTreasury), _expectedFee)
         );
 
         // it should transfer the remaining amount to the pool
-        vm.mockCall(
-            fakePool.token,
-            abi.encodeWithSelector(IERC20.transfer.selector, address(_strategy), _expectedAmount),
-            abi.encode(true)
-        );
         vm.expectCall(
-            fakePool.token, abi.encodeWithSelector(IERC20.transfer.selector, address(_strategy), _expectedAmount)
-        );
-        // TODO: 2nd call of balanceOf should return the expectedAmount that was transfered
-        vm.mockCall(
             fakePool.token,
-            abi.encodeWithSelector(IERC20.balanceOf.selector, address(_strategy)),
-            abi.encode(_expectedAmount)
+            abi.encodeWithSelector(IERC20.transferFrom.selector, _funder, address(_strategy), _expectedAmount)
         );
+
         // it should increase the pool amount
         vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.increasePoolAmount.selector, _expectedAmount));
 
         allo.call__fundPool(_amount, _funder, _poolId, IBaseStrategy(_strategy));
-        assertEq(IBaseStrategy(_strategy).getPoolAmount(), _expectedAmount);
     }
 
     function test__fundPoolWhenFeeAmountIsZero(uint256 _amount, address _funder, uint256 _poolId, address _strategy)
         external
     {
-        vm.skip(true);
+        vm.assume(_strategy != address(0));
+        vm.assume(_strategy != address(vm));
+        vm.assume(_funder != address(0));
         vm.assume(_amount > 0);
+        vm.assume(_funder != _strategy);
+
+        fakePool.token = address(fakeToken);
+        deal(address(fakeToken), _funder, _amount);
+        vm.prank(_funder);
+        fakeToken.approve(address(allo), type(uint256).max);
+
+        vm.mockCall(_strategy, abi.encodeWithSelector(IBaseStrategy.increasePoolAmount.selector, _amount), abi.encode());
 
         fakePool.strategy = IBaseStrategy(_strategy);
         allo.setPool(_poolId, fakePool);
-        // it should transfer the amount to the pool
-        vm.mockCall(
-            fakePool.token,
-            abi.encodeWithSelector(IERC20.transfer.selector, address(_strategy), _amount),
-            abi.encode(true)
+
+        vm.expectCall(
+            fakePool.token, abi.encodeWithSelector(IERC20.transferFrom.selector, _funder, address(_strategy), _amount)
         );
-        vm.expectCall(fakePool.token, abi.encodeWithSelector(IERC20.transfer.selector, address(_strategy), _amount));
         // it should increase the pool amount
         vm.expectCall(_strategy, abi.encodeWithSelector(IBaseStrategy.increasePoolAmount.selector, _amount));
         // it should emit event
@@ -1499,7 +1510,6 @@ contract AlloUnit is Test {
         emit IAllo.PoolFunded(_poolId, _amount, 0);
 
         allo.call__fundPool(_amount, _funder, _poolId, IBaseStrategy(_strategy));
-        assertEq(IBaseStrategy(_strategy).getPoolAmount(), _amount);
     }
 
     function test__isPoolAdminWhenHasRoleAdmin(uint256 _poolId, address _poolAdmin) external {
