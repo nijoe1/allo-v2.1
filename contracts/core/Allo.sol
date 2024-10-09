@@ -595,8 +595,6 @@ contract Allo is IAllo, Native, Initializable, Ownable, AccessControlUpgradeable
         Pool storage pool = pools[_poolId];
         address _token = pool.token;
 
-        if (_token == NATIVE && msg.value < _amount) revert ETH_MISMATCH();
-
         if (feeAmount > 0) {
             uint256 balanceBeforeFee = _token.getBalance(treasury);
             _token.transferAmountFrom(_funder, treasury, feeAmount);

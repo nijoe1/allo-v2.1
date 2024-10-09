@@ -1416,22 +1416,6 @@ contract AlloUnit is Test {
         );
     }
 
-    function test__fundPoolRevertWhen_TokenIsNativeAndValueIsLessThanAmount(
-        uint256 _amount,
-        address _funder,
-        uint256 _poolId,
-        IBaseStrategy _strategy
-    ) external {
-        vm.assume(_amount > 0);
-
-        fakePool.token = NATIVE;
-        fakePool.strategy = _strategy;
-        allo.setPool(_poolId, fakePool);
-        // it should revert
-        vm.expectRevert(Errors.ETH_MISMATCH.selector);
-        allo.call__fundPool(_amount, _funder, _poolId, _strategy);
-    }
-
     function test__fundPoolWhenFeeAmountIsMoreThanZero(
         uint256 _amount,
         address _funder,
