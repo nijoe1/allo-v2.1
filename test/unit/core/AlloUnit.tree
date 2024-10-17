@@ -201,6 +201,8 @@ AlloUnit::_createPool
     └── it should call _fundPool
 
 AlloUnit::_fundPool
+├── when token is native and value is less than amount
+│   └── it should revert
 ├── when fee amount is more than zero
 │   ├── it should call getBalance on the treasury
 │   ├── it should transfer the fee to the treasury

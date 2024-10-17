@@ -334,7 +334,7 @@ contract AlloUnit is Test {
         vm.assume(_percentFee > 1e18);
 
         // it should revert
-        vm.expectRevert(Errors.INVALID_FEE.selector);
+        vm.expectRevert(Errors.INVALID.selector);
         allo.updatePercentFee(_percentFee);
     }
 
@@ -564,10 +564,10 @@ contract AlloUnit is Test {
     function test_RecoverFundsWhenTokenIsNative(address _recipient) external whenSenderIsOwner {
         vm.assume(_recipient != address(0));
         vm.assume(_recipient.code.length == 0);
+        vm.assume(_recipient.balance == 0);
+        assumeNotPrecompile(_recipient);
 
         deal(address(allo), 100 ether);
-
-        assertEq(_recipient.balance, 0);
 
         allo.recoverFunds(NATIVE, _recipient);
         // it should transfer the whole balance of native token
@@ -654,7 +654,7 @@ contract AlloUnit is Test {
         _recipients[0][0] = address(1);
 
         // it should revert
-        vm.expectRevert(Errors.MISMATCH.selector);
+        vm.expectRevert(Errors.ARRAY_MISMATCH.selector);
 
         allo.batchRegisterRecipient(_poolIds, _recipients, _data);
     }
@@ -669,7 +669,7 @@ contract AlloUnit is Test {
         bytes[] memory _data = new bytes[](1);
         _data[0] = "data";
         // it should revert
-        vm.expectRevert(Errors.MISMATCH.selector);
+        vm.expectRevert(Errors.ARRAY_MISMATCH.selector);
 
         allo.batchRegisterRecipient(_poolIds, _recipients, _data);
     }
@@ -706,7 +706,7 @@ contract AlloUnit is Test {
 
     function test_FundPoolRevertWhen_AmountIsZero(uint256 _poolId) external {
         // it should revert
-        vm.expectRevert(Errors.NOT_ENOUGH_FUNDS.selector);
+        vm.expectRevert(Errors.INVALID.selector);
 
         allo.fundPool(_poolId, 0);
     }
@@ -720,7 +720,7 @@ contract AlloUnit is Test {
 
         allo.setPool(_poolId, fakePool);
         // it should revert
-        vm.expectRevert(Errors.NOT_ENOUGH_FUNDS.selector);
+        vm.expectRevert(Errors.ETH_MISMATCH.selector);
         allo.fundPool(_poolId, _amount);
     }
 
@@ -786,7 +786,7 @@ contract AlloUnit is Test {
         _values[0] = 1;
 
         // it should revert
-        vm.expectRevert(Errors.MISMATCH.selector);
+        vm.expectRevert(Errors.ARRAY_MISMATCH.selector);
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
@@ -808,7 +808,7 @@ contract AlloUnit is Test {
         _datas[0] = "data";
 
         // it should revert
-        vm.expectRevert(Errors.MISMATCH.selector);
+        vm.expectRevert(Errors.ARRAY_MISMATCH.selector);
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
@@ -831,7 +831,7 @@ contract AlloUnit is Test {
         _datas[0] = "data";
 
         // it should revert
-        vm.expectRevert(Errors.MISMATCH.selector);
+        vm.expectRevert(Errors.ARRAY_MISMATCH.selector);
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
@@ -853,7 +853,7 @@ contract AlloUnit is Test {
         _datas[0] = "data";
 
         // it should revert
-        vm.expectRevert(Errors.MISMATCH.selector);
+        vm.expectRevert(Errors.ARRAY_MISMATCH.selector);
         allo.batchAllocate(_poolIds, _recipients, _amounts, _values, _datas);
     }
 
@@ -1008,6 +1008,9 @@ contract AlloUnit is Test {
         Metadata memory _metadata,
         address[] memory _managers
     ) external {
+        vm.assume(_strategy != address(vm));
+        assumeNotPrecompile(_strategy);
+
         vm.mockCall(
             fakeRegistry,
             abi.encodeWithSelector(IRegistry.isOwnerOrMemberOfProfile.selector, _profileId, address(this)),
@@ -1227,7 +1230,7 @@ contract AlloUnit is Test {
         }
 
         // it should revert
-        vm.expectRevert(Errors.NOT_ENOUGH_FUNDS.selector);
+        vm.expectRevert(Errors.ETH_MISMATCH.selector);
 
         allo.call__createPool(
             address(this),
@@ -1287,7 +1290,7 @@ contract AlloUnit is Test {
         }
 
         // it should revert
-        vm.expectRevert(Errors.NOT_ENOUGH_FUNDS.selector);
+        vm.expectRevert(Errors.ETH_MISMATCH.selector);
 
         allo.call__createPool(
             address(this),
@@ -1312,15 +1315,17 @@ contract AlloUnit is Test {
         address[] memory _managers
     ) external whenBaseFeeIsMoreThanZero {
         vm.assume(_strategy != address(0));
-        vm.assume(_strategy != address(vm));
         vm.assume(_strategy != address(this));
         vm.assume(_strategy != address(allo));
+        vm.assume(_strategy != address(vm));
         vm.assume(_token != NATIVE);
-        vm.assume(_token != address(vm));
         vm.assume(_token != address(fakeToken));
-        vm.assume(_token != address(allo));
         vm.assume(_token != address(this));
+        vm.assume(_token != address(allo));
+        vm.assume(_token != address(vm));
+        vm.assume(_token != 0x4e59b44847b379578588920cA78FbF26c0B4956C); // Create2Deployer
         assumeNotPrecompile(_strategy);
+        assumeNotPrecompile(_token);
 
         uint256 _fee = 1 ether;
         uint256 _msgValue = _fee;
@@ -1375,6 +1380,10 @@ contract AlloUnit is Test {
     ) external {
         vm.assume(_amount > 0);
         vm.assume(_token != NATIVE);
+        vm.assume(_token != address(vm));
+        vm.assume(_strategy != address(vm));
+        assumeNotPrecompile(_strategy);
+        assumeNotPrecompile(_token);
 
         vm.mockCall(
             fakeRegistry,
@@ -1414,6 +1423,22 @@ contract AlloUnit is Test {
             _metadata,
             _managers
         );
+    }
+
+    function test__fundPoolRevertWhen_TokenIsNativeAndValueIsLessThanAmount(
+        uint256 _amount,
+        address _funder,
+        uint256 _poolId,
+        IBaseStrategy _strategy
+    ) external {
+        vm.assume(_amount > 0);
+
+        fakePool.token = NATIVE;
+        fakePool.strategy = _strategy;
+        allo.setPool(_poolId, fakePool);
+        // it should revert
+        vm.expectRevert(Errors.ETH_MISMATCH.selector);
+        allo.call__fundPool(_amount, _funder, _poolId, _strategy);
     }
 
     function test__fundPoolWhenFeeAmountIsMoreThanZero(
