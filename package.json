@@ -9,7 +9,7 @@
   "private": true,
   "scripts": {
     "compile": "forge compile",
-    "build": "bun run smock && forge build",
+    "build": "forge build",
     "test": "forge test",
     "fmt": "forge fmt contracts/**/*.sol && forge fmt test/**/*.sol",
     "lint:sol": "solhint -c .solhint.json 'contracts/**/*.sol'",
